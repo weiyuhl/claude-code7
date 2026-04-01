@@ -2,10 +2,11 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionConfig {
-    #[serde(rename = "api_key")]
+    #[serde(default)]
     pub api_key: String,
+    #[serde(default)]
     pub model: String,
-    #[serde(rename = "max_tokens")]
+    #[serde(default = "default_max_tokens")]
     pub max_tokens: usize,
     #[serde(default)]
     pub provider: Option<String>,
@@ -17,6 +18,10 @@ pub struct SessionConfig {
     pub thinking_enabled: Option<bool>,
     #[serde(default)]
     pub working_directory: Option<String>,
+}
+
+fn default_max_tokens() -> usize {
+    4096
 }
 
 impl SessionConfig {

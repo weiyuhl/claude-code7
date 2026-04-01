@@ -8,6 +8,29 @@ void main() {
   runApp(const MyApp());
 }
 
+// 全局状态管理
+class AppState {
+  static final AppState _instance = AppState._internal();
+  factory AppState() => _instance;
+  AppState._internal();
+
+  ClaudeCore? claudeCore;
+  Pointer<Void>? session;
+  String currentProvider = 'openrouter';
+  String currentModel = '';
+  final Map<String, String> apiKeys = {
+    'openrouter': '',
+    'deepseek': '',
+    'siliconflow': '',
+  };
+  final Map<String, List<String>> models = {
+    'openrouter': [],
+    'deepseek': [],
+    'siliconflow': [],
+  };
+  final List<String> providers = ['openrouter', 'deepseek', 'siliconflow'];
+}
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -93,7 +116,7 @@ class _ChatPageState extends State<ChatPage> {
 
   void _createSession() {
     if (_claudeCore == null) return;
-    
+
     if (_session != null) {
       _claudeCore!.destroySession(_session!);
     }
@@ -103,19 +126,19 @@ class _ChatPageState extends State<ChatPage> {
       'model': '',
       'max_tokens': 4096,
     };
-    
+
     _session = _claudeCore!.createSession(config);
     _refreshInfo();
   }
 
   Future<void> _refreshInfo() async {
     if (_session == null || _claudeCore == null) return;
-    
+
     final apiKey = _apiKeys[_currentProvider] ?? '';
     if (apiKey.isEmpty) return;
-    
+
     _claudeCore!.setProvider(_session!, _currentProvider, apiKey);
-    
+
     try {
       final modelsList = _claudeCore!.listModels(_session!);
       if (modelsList.isNotEmpty) {
@@ -130,7 +153,7 @@ class _ChatPageState extends State<ChatPage> {
     } catch (e) {
       print('获取模型列表失败：$e');
     }
-    
+
     try {
       final balanceInfo = _claudeCore!.getBalance(_session!);
       setState(() {
@@ -174,8 +197,8 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {
       _messages.add({'role': 'user', 'content': text});
       _messages.add({
-        'role': 'assistant', 
-        'content': '', 
+        'role': 'assistant',
+        'content': '',
         'thinking': '',
         'tool_use': null,
       });
@@ -187,13 +210,13 @@ class _ChatPageState extends State<ChatPage> {
     try {
       String fullContent = '';
       String fullThinking = '';
-      
+
       _claudeCore!.streamMessage(_session!, text, (chunk) {
         if (mounted) {
           setState(() {
             final type = chunk['type'];
             final content = chunk['content'];
-            
+
             if (type == 'content') {
               fullContent += content;
               _messages.last['content'] = fullContent;
@@ -207,7 +230,7 @@ class _ChatPageState extends State<ChatPage> {
           _scrollToBottom();
         }
       });
-      
+
       setState(() {
         _isStreaming = false;
       });
@@ -232,11 +255,14 @@ class _ChatPageState extends State<ChatPage> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: Text('Jasmine AI', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        title: Text(
+          'Jasmine AI',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+        ),
         elevation: 0,
         backgroundColor: Colors.transparent,
         actions: [
@@ -252,9 +278,12 @@ class _ChatPageState extends State<ChatPage> {
           Expanded(
             child: _messages.isEmpty
                 ? _buildEmptyState()
-                  : ListView.builder(
+                : ListView.builder(
                     controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {
                       final msg = _messages[index];
@@ -281,20 +310,31 @@ class _ChatPageState extends State<ChatPage> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+              color: Theme.of(
+                context,
+              ).colorScheme.primaryContainer.withOpacity(0.3),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.auto_awesome, size: 64, color: Theme.of(context).colorScheme.primary),
+            child: Icon(
+              Icons.auto_awesome,
+              size: 64,
+              color: Theme.of(context).colorScheme.primary,
+            ),
           ),
           const SizedBox(height: 24),
           Text(
             '有什么可以帮您的？',
-            style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w600),
+            style: GoogleFonts.outfit(
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             '切换设置来更改模型或供应商',
-            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -329,7 +369,10 @@ class _ChatPageState extends State<ChatPage> {
                 minLines: 1,
                 decoration: const InputDecoration(
                   hintText: '输入消息...',
-                  contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
                   border: InputBorder.none,
                 ),
               ),
@@ -358,125 +401,430 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _showSettings() {
-    final apiKeyController = TextEditingController(text: _apiKeys[_currentProvider]);
-    
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SettingsPage(
+          claudeCore: _claudeCore,
+          currentProvider: _currentProvider,
+          currentModel: _currentModel,
+          apiKeys: _apiKeys,
+          models: _models,
+          providers: _providers,
+          onSettingsChanged: (provider, model) {
+            setState(() {
+              _currentProvider = provider;
+              _currentModel = model;
+            });
+            _createSession();
+          },
+        ),
       ),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            left: 24, right: 24, top: 24
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('配置中心', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold)),
-                    IconButton(
-                      icon: const Icon(Icons.refresh),
-                      onPressed: () {
-                        _refreshInfo();
-                        Navigator.pop(context);
-                        _showSettings(); // Re-open to see updates
-                      },
-                    ),
-                  ],
+    );
+  }
+}
+
+class SettingsPage extends StatefulWidget {
+  final ClaudeCore? claudeCore;
+  final String currentProvider;
+  final String currentModel;
+  final Map<String, String> apiKeys;
+  final Map<String, List<String>> models;
+  final List<String> providers;
+  final Function(String provider, String model) onSettingsChanged;
+
+  const SettingsPage({
+    super.key,
+    required this.claudeCore,
+    required this.currentProvider,
+    required this.currentModel,
+    required this.apiKeys,
+    required this.models,
+    required this.providers,
+    required this.onSettingsChanged,
+  });
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  late String _selectedProvider;
+  late String _selectedModel;
+  late TextEditingController _apiKeyController;
+  late Map<String, List<String>> _models;
+  bool _isLoadingModels = false;
+  bool _isLoadingBalance = false;
+  Map<String, dynamic> _balance = {};
+  Pointer<Void>? _tempSession;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedProvider = widget.currentProvider;
+    _selectedModel = widget.currentModel;
+    _apiKeyController = TextEditingController(
+      text: widget.apiKeys[_selectedProvider] ?? '',
+    );
+    _models = Map.from(widget.models);
+    _createTempSession();
+  }
+
+  @override
+  void dispose() {
+    _apiKeyController.dispose();
+    _destroyTempSession();
+    super.dispose();
+  }
+
+  void _createTempSession() {
+    if (widget.claudeCore == null) return;
+
+    _destroyTempSession();
+
+    final config = {
+      'provider': _selectedProvider,
+      'model': 'auto',
+      'max_tokens': 4096,
+    };
+
+    _tempSession = widget.claudeCore!.createSession(config);
+    if (_tempSession == nullptr) {
+      _showSnackBar('创建会话失败', isError: true);
+    }
+  }
+
+  void _destroyTempSession() {
+    if (_tempSession != null && widget.claudeCore != null) {
+      widget.claudeCore!.destroySession(_tempSession!);
+      _tempSession = null;
+    }
+  }
+
+  Future<void> _fetchModels() async {
+    if (widget.claudeCore == null) {
+      _showSnackBar('Rust 核心未初始化', isError: true);
+      return;
+    }
+
+    if (_tempSession == null || _tempSession == nullptr) {
+      _showSnackBar('会话未创建，请重试', isError: true);
+      return;
+    }
+
+    final apiKey = _apiKeyController.text.trim();
+    if (apiKey.isEmpty) {
+      _showSnackBar('请先输入 API Key', isError: true);
+      return;
+    }
+
+    setState(() {
+      _isLoadingModels = true;
+    });
+
+    try {
+      final providerSet = widget.claudeCore!.setProvider(
+        _tempSession!,
+        _selectedProvider,
+        apiKey,
+      );
+      if (!providerSet) {
+        _showSnackBar('设置供应商失败', isError: true);
+        return;
+      }
+
+      final modelsList = widget.claudeCore!.listModels(_tempSession!);
+
+      if (modelsList.isNotEmpty) {
+        final modelIds = modelsList.map((m) => m['id'].toString()).toList();
+        setState(() {
+          _models[_selectedProvider] = modelIds;
+          if (modelIds.isNotEmpty && !modelIds.contains(_selectedModel)) {
+            _selectedModel = modelIds.first;
+          }
+        });
+        _showSnackBar('成功获取 ${modelIds.length} 个模型');
+      } else {
+        _showSnackBar('未获取到模型列表', isError: true);
+      }
+    } catch (e) {
+      _showSnackBar('获取模型失败: $e', isError: true);
+    } finally {
+      setState(() {
+        _isLoadingModels = false;
+      });
+    }
+  }
+
+  Future<void> _fetchBalance() async {
+    if (widget.claudeCore == null) {
+      _showSnackBar('Rust 核心未初始化', isError: true);
+      return;
+    }
+
+    if (_tempSession == null || _tempSession == nullptr) {
+      _showSnackBar('会话未创建，请重试', isError: true);
+      return;
+    }
+
+    final apiKey = _apiKeyController.text.trim();
+    if (apiKey.isEmpty) {
+      _showSnackBar('请先输入 API Key', isError: true);
+      return;
+    }
+
+    setState(() {
+      _isLoadingBalance = true;
+    });
+
+    try {
+      final providerSet = widget.claudeCore!.setProvider(
+        _tempSession!,
+        _selectedProvider,
+        apiKey,
+      );
+      if (!providerSet) {
+        _showSnackBar('设置供应商失败', isError: true);
+        return;
+      }
+
+      final balanceInfo = widget.claudeCore!.getBalance(_tempSession!);
+
+      setState(() {
+        _balance = balanceInfo;
+      });
+
+      final balance = balanceInfo['total_balance'] ?? '0';
+      final currency = balanceInfo['currency'] ?? '';
+      _showSnackBar('余额: $balance $currency');
+    } catch (e) {
+      _showSnackBar('获取余额失败: $e', isError: true);
+    } finally {
+      setState(() {
+        _isLoadingBalance = false;
+      });
+    }
+  }
+
+  void _saveSettings() {
+    final apiKey = _apiKeyController.text.trim();
+    if (apiKey.isEmpty) {
+      _showSnackBar('请输入 API Key', isError: true);
+      return;
+    }
+
+    // 保存 API Key
+    widget.apiKeys[_selectedProvider] = apiKey;
+
+    // 回调通知父页面
+    widget.onSettingsChanged(_selectedProvider, _selectedModel);
+
+    _showSnackBar('设置已保存');
+    Navigator.pop(context);
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.redAccent : Colors.green,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final currentModels = _models[_selectedProvider] ?? [];
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          '供应商配置',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+        ),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 供应商选择
+            _buildSectionTitle('供应商'),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _selectedProvider,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.cloud_outlined),
+              ),
+              items: widget.providers.map((p) {
+                return DropdownMenuItem(value: p, child: Text(p.toUpperCase()));
+              }).toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() {
+                    _selectedProvider = val;
+                    _apiKeyController.text = widget.apiKeys[val] ?? '';
+                    _selectedModel = '';
+                  });
+                }
+              },
+            ),
+
+            const SizedBox(height: 24),
+
+            // API Key 输入
+            _buildSectionTitle('API Key'),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _apiKeyController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.key_outlined),
+                hintText: '输入您的 API Key',
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // 获取模型列表按钮
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _isLoadingModels ? null : _fetchModels,
+                icon: _isLoadingModels
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh),
+                label: Text(_isLoadingModels ? '获取中...' : '获取模型列表'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                if (_balance.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.4),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.account_balance_wallet_outlined, size: 20),
-                        const SizedBox(width: 8),
-                        Text('余额: ${_balance['total_balance'] ?? '0'} ${_balance['currency'] ?? ''}'),
-                      ],
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 24),
-                const Text('供应商', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: _currentProvider,
-                  decoration: const InputDecoration(border: OutlineInputBorder()),
-                  items: _providers.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
-                  onChanged: (val) async {
-                    if (val != null) {
-                      setState(() {
-                        _currentProvider = val;
-                        _currentModel = '';
-                        apiKeyController.text = _apiKeys[val] ?? '';
-                      });
-                      setModalState(() {
-                        _currentProvider = val;
-                        _currentModel = _models[val]?.isNotEmpty == true ? _models[val]!.first : '加载中...';
-                      });
-                      _createSession();
-                      
-                      // Fetch models after switching provider
-                      if ((_apiKeys[val] ?? '').isNotEmpty) {
-                        await Future.delayed(const Duration(milliseconds: 500));
-                        await _refreshInfo();
-                        setModalState(() {
-                          _currentModel = _models[val]?.isNotEmpty == true ? _models[val]!.first : '无可用模型';
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // 模型选择
+            _buildSectionTitle('模型'),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: currentModels.isNotEmpty ? _selectedModel : null,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.model_training_outlined),
+                hintText: '请先获取模型列表',
+              ),
+              items: currentModels.map((m) {
+                return DropdownMenuItem(
+                  value: m,
+                  child: Text(m, overflow: TextOverflow.ellipsis),
+                );
+              }).toList(),
+              onChanged: currentModels.isNotEmpty
+                  ? (val) {
+                      if (val != null) {
+                        setState(() {
+                          _selectedModel = val;
                         });
                       }
                     }
-                  },
-                ),
-                const SizedBox(height: 16),
-                const Text('API Key', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: apiKeyController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    hintText: '输入您的 API Key',
-                  ),
-                  onChanged: (val) {
-                    _apiKeys[_currentProvider] = val;
-                  },
-                ),
-                const SizedBox(height: 16),
-                const Text('模型', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: _models[_currentProvider]?.isNotEmpty == true ? _currentModel : null,
-                  decoration: const InputDecoration(border: OutlineInputBorder()),
-                  hint: const Text('请先输入 API Key 获取模型列表'),
-                  items: _models[_currentProvider]!.isNotEmpty
-                      ? _models[_currentProvider]!.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList()
-                      : [],
-                  onChanged: _models[_currentProvider]!.isNotEmpty ? (val) {
-                    if (val != null) {
-                      setModalState(() => _currentModel = val);
-                      setState(() => _currentModel = val);
-                      _createSession();
-                    }
-                  } : null,
-                ),
-                const SizedBox(height: 32),
-              ],
+                  : null,
             ),
-          ),
+
+            const SizedBox(height: 24),
+
+            // 获取余额按钮
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _isLoadingBalance ? null : _fetchBalance,
+                icon: _isLoadingBalance
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.account_balance_wallet_outlined),
+                label: Text(_isLoadingBalance ? '获取中...' : '获取余额'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // 余额显示
+            if (_balance.isNotEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.account_balance_wallet_outlined, size: 24),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '当前余额',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        Text(
+                          '${_balance['total_balance'] ?? '0'} ${_balance['currency'] ?? ''}',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+            const SizedBox(height: 32),
+
+            // 保存按钮
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: _saveSettings,
+                icon: const Icon(Icons.save_outlined),
+                label: const Text('保存设置'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
     );
   }
 }
@@ -488,32 +836,40 @@ class _MessageBubble extends StatelessWidget {
   final bool isUser;
 
   const _MessageBubble({
-    required this.content, 
-    this.thinking, 
+    required this.content,
+    this.thinking,
     this.toolUse,
-    required this.isUser
+    required this.isUser,
   });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
-        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isUser
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isUser) ...[
             CircleAvatar(
               backgroundColor: colorScheme.primaryContainer,
-              child: Icon(Icons.smart_toy_outlined, size: 20, color: colorScheme.primary),
+              child: Icon(
+                Icons.smart_toy_outlined,
+                size: 20,
+                color: colorScheme.primary,
+              ),
             ),
             const SizedBox(width: 12),
           ],
           Flexible(
             child: Column(
-              crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              crossAxisAlignment: isUser
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
               children: [
                 if (!isUser && thinking != null && thinking!.isNotEmpty)
                   _buildThinkingBlock(context, thinking!),
@@ -521,20 +877,31 @@ class _MessageBubble extends StatelessWidget {
                   _buildToolUseBlock(context, toolUse),
                 if (content.isNotEmpty)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
-                      color: isUser ? colorScheme.primary : colorScheme.surfaceVariant,
+                      color: isUser
+                          ? colorScheme.primary
+                          : colorScheme.surfaceVariant,
                       borderRadius: BorderRadius.only(
                         topLeft: const Radius.circular(16),
                         topRight: const Radius.circular(16),
-                        bottomLeft: isUser ? const Radius.circular(16) : Radius.zero,
-                        bottomRight: isUser ? Radius.zero : const Radius.circular(16),
+                        bottomLeft: isUser
+                            ? const Radius.circular(16)
+                            : Radius.zero,
+                        bottomRight: isUser
+                            ? Radius.zero
+                            : const Radius.circular(16),
                       ),
                     ),
                     child: Text(
                       content,
                       style: TextStyle(
-                        color: isUser ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
+                        color: isUser
+                            ? colorScheme.onPrimary
+                            : colorScheme.onSurfaceVariant,
                         fontSize: 16,
                         height: 1.4,
                       ),
@@ -556,16 +923,29 @@ class _MessageBubble extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.4),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.5)),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.5),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.psychology_outlined, size: 16, color: Theme.of(context).colorScheme.primary),
+              Icon(
+                Icons.psychology_outlined,
+                size: 16,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               const SizedBox(width: 8),
-              Text('思考中...', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary)),
+              Text(
+                '思考中...',
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -574,7 +954,9 @@ class _MessageBubble extends StatelessWidget {
             style: TextStyle(
               fontSize: 14,
               fontStyle: FontStyle.italic,
-              color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurfaceVariant.withOpacity(0.7),
             ),
           ),
         ],
@@ -596,16 +978,24 @@ class _MessageBubble extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.build_circle_outlined, size: 16, color: Colors.amber),
+              const Icon(
+                Icons.build_circle_outlined,
+                size: 16,
+                color: Colors.amber,
+              ),
               const SizedBox(width: 8),
-              Text('调用工具', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.amber)),
+              Text(
+                '调用工具',
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.amber,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 4),
-          Text(
-            toolUse.toString(),
-            style: GoogleFonts.firaCode(fontSize: 12),
-          ),
+          Text(toolUse.toString(), style: GoogleFonts.firaCode(fontSize: 12)),
         ],
       ),
     );
