@@ -3,3 +3,12 @@ dist/
 bun.lock
 *.node
 .DS_Store
+
+# Rust
+**/target/
+**/*.rs.bk
+Cargo.lock
+*.pdb
+
+# 构建脚本
+**/build-android.sh

@@ -1,0 +1,16 @@
+# 配置只编译 Android ARM64 平台
+# 不编译其他任何平台（Windows、iOS、macOS、Linux、Web）
+
+[build]
+# 默认目标为 Android ARM64
+target = "aarch64-linux-android"
+
+# Android ARM64 特定配置
+[target.aarch64-linux-android]
+linker = "D:\\Android\\Sdk\\ndk\\27.0.12077973\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\aarch64-linux-android21-clang.cmd"
+ar = "D:\\Android\\Sdk\\ndk\\27.0.12077973\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\llvm-ar.exe"
+
+[env]
+CC_aarch64_linux_android = "D:\\Android\\Sdk\\ndk\\27.0.12077973\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\aarch64-linux-android21-clang.cmd"
+CFLAGS_aarch64_linux_android = "--target=aarch64-linux-android"
+AR_aarch64_linux_android = "D:\\Android\\Sdk\\ndk\\27.0.12077973\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\llvm-ar.exe"
