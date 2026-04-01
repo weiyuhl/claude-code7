@@ -83,7 +83,9 @@ struct Choice {
 
 #[derive(Deserialize)]
 struct ResponseMessage {
-    content: String,
+    content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_content: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -160,24 +162,21 @@ impl Provider for SiliconFlowProvider {
                 message: e.to_string(),
             })?;
 
-        let content = response
-            .choices
-            .first()
-            .map(|c| c.message.content.clone())
-            .unwrap_or_default();
+        let first_choice = response.choices.first().ok_or_else(|| ClaudeError::ApiError {
+            provider: "siliconflow".to_string(),
+            message: "No choices in response".to_string(),
+        })?;
 
         Ok(ModelResponse {
             id: response.id,
-            content,
+            content: first_choice.message.content.clone().unwrap_or_default(),
+            thinking: first_choice.message.reasoning_content.clone(),
             model: response.model,
             usage: Usage {
                 input_tokens: response.usage.prompt_tokens,
                 output_tokens: response.usage.completion_tokens,
             },
-            stop_reason: response
-                .choices
-                .first()
-                .and_then(|c| c.finish_reason.clone()),
+            stop_reason: first_choice.finish_reason.clone(),
         })
     }
 
@@ -227,21 +226,43 @@ impl Provider for SiliconFlowProvider {
         use futures::StreamExt;
 
         let mut stream = response.bytes_stream();
+        let mut buffer = Vec::new();
+
         while let Some(item) = stream.next().await {
             match item {
                 Ok(bytes) => {
-                    if let Ok(line) = String::from_utf8(bytes.to_vec()) {
+                    buffer.extend_from_slice(&bytes);
+                    
+                    while let Some(pos) = buffer.iter().position(|&b| b == b'\n') {
+                        let line = String::from_utf8_lossy(&buffer[..pos]).trim().to_string();
+                        buffer.drain(..pos + 1);
+
                         if line.starts_with("data: ") {
-                            let data = &line[6..];
+                            let data = line[6..].trim();
                             if data == "[DONE]" {
-                                break;
+                                return Ok(full_response);
                             }
+                            
                             if let Ok(event) = serde_json::from_str::<SSEEvent>(data) {
                                 if let Some(choices) = &event.choices {
                                     if let Some(first_choice) = choices.get(0) {
-                                        if let Some(ref delta) = first_choice.delta.content {
-                                            full_response.push_str(delta);
-                                            callback(delta.clone());
+                                        let delta = &first_choice.delta;
+                                        
+                                        if let Some(content) = &delta.content {
+                                            full_response.push_str(content);
+                                            let chunk = serde_json::json!({
+                                                "type": "content",
+                                                "content": content
+                                            });
+                                            callback(chunk.to_string());
+                                        }
+                                        
+                                        if let Some(reasoning) = &delta.reasoning_content {
+                                            let chunk = serde_json::json!({
+                                                "type": "thinking",
+                                                "content": reasoning
+                                            });
+                                            callback(chunk.to_string());
                                         }
                                     }
                                 }
@@ -379,4 +400,6 @@ struct SSEDelta {
 struct DeltaContent {
     #[serde(skip_serializing_if = "Option::is_none")]
     content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reasoning_content: Option<String>,
 }

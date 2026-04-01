@@ -165,3 +165,53 @@ pub extern "C" fn set_provider(
     *session_provider = Some(provider);
     true
 }
+
+#[no_mangle]
+pub extern "C" fn list_models(session_ptr: *mut c_void) -> *mut c_char {
+    if session_ptr.is_null() {
+        return ptr::null_mut();
+    }
+
+    let session = unsafe { &*(session_ptr as *mut Session) };
+    let provider_guard = session.provider.read();
+    
+    let provider = match &*provider_guard {
+        Some(p) => p,
+        None => return ptr::null_mut(),
+    };
+    
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    match rt.block_on(provider.list_models()) {
+        Ok(models) => {
+            let json = serde_json::to_string(&models).unwrap();
+            let c_str = std::ffi::CString::new(json).unwrap();
+            c_str.into_raw() as *mut c_char
+        }
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn get_balance(session_ptr: *mut c_void) -> *mut c_char {
+    if session_ptr.is_null() {
+        return ptr::null_mut();
+    }
+
+    let session = unsafe { &*(session_ptr as *mut Session) };
+    let provider_guard = session.provider.read();
+    
+    let provider = match &*provider_guard {
+        Some(p) => p,
+        None => return ptr::null_mut(),
+    };
+    
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    match rt.block_on(provider.get_balance()) {
+        Ok(balance) => {
+            let json = serde_json::to_string(&balance).unwrap();
+            let c_str = std::ffi::CString::new(json).unwrap();
+            c_str.into_raw() as *mut c_char
+        }
+        Err(_) => ptr::null_mut(),
+    }
+}

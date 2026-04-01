@@ -18,6 +18,10 @@ void claude_destroy_session(void *session);
 
 char *claude_get_messages(void *session);
 
+char *claude_list_models(void *session);
+
+char *claude_get_balance(void *session);
+
 void claude_free_string(char *s);
 
 void *create_session(const char *config_str);
@@ -36,3 +40,7 @@ char *get_messages(void *session_ptr);
 void free_string(char *ptr);
 
 bool set_provider(void *session_ptr, const char *provider_name, const char *api_key);
+
+char *list_models(void *session_ptr);
+
+char *get_balance(void *session_ptr);

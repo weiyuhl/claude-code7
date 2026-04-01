@@ -29,6 +29,22 @@ impl Session {
         messages.push(message);
         Ok(())
     }
+
+    pub async fn list_models(&self) -> Result<Vec<crate::api::providers::ModelInfo>, ClaudeError> {
+        let provider = self.provider.read();
+        let provider = provider.as_ref().ok_or_else(|| ClaudeError::ConfigError {
+            message: "No provider configured".to_string(),
+        })?;
+        provider.list_models().await
+    }
+
+    pub async fn get_balance(&self) -> Result<crate::api::providers::BalanceInfo, ClaudeError> {
+        let provider = self.provider.read();
+        let provider = provider.as_ref().ok_or_else(|| ClaudeError::ConfigError {
+            message: "No provider configured".to_string(),
+        })?;
+        provider.get_balance().await
+    }
 }
 
 pub struct SessionManager {
@@ -142,7 +158,15 @@ pub extern "C" fn claude_send_message(
         Err(e) => serde_json::to_string(&e).unwrap_or_else(|_| r#"{"error":"unknown"}"#.to_string()),
     };
 
-    let assistant_message = Message::assistant(&response_str);
+    let assistant_message = if let Ok(val) = serde_json::from_str::<serde_json::Value>(&response_str) {
+        let content = val.get("content").and_then(|v| v.as_str()).unwrap_or(&response_str).to_string();
+        let thinking = val.get("thinking").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let mut msg = Message::assistant(content);
+        msg.thinking = thinking;
+        msg
+    } else {
+        Message::assistant(&response_str)
+    };
 
     {
         let mut messages = session.messages.write();
@@ -251,6 +275,54 @@ pub extern "C" fn claude_get_messages(session: *mut c_void) -> *mut c_char {
         Ok(s) => s.into_raw(),
         Err(_) => ptr::null_mut(),
     }
+}
+
+#[no_mangle]
+pub extern "C" fn claude_list_models(session: *mut c_void) -> *mut c_char {
+    if session.is_null() {
+        return ptr::null_mut();
+    }
+
+    let session = unsafe { &*(session as *const Arc<Session>) };
+
+    let response = tokio::runtime::Runtime::new()
+        .unwrap()
+        .block_on(session.list_models());
+
+    let response_str = match response {
+        Ok(models) => serde_json::to_string(&models).unwrap_or_else(|_| "[]".to_string()),
+        Err(e) => {
+            eprintln!("Error listing models: {:?}", e);
+            "[]".to_string()
+        }
+    };
+
+    let c_str = std::ffi::CString::new(response_str).unwrap();
+    c_str.into_raw() as *mut c_char
+}
+
+#[no_mangle]
+pub extern "C" fn claude_get_balance(session: *mut c_void) -> *mut c_char {
+    if session.is_null() {
+        return ptr::null_mut();
+    }
+
+    let session = unsafe { &*(session as *const Arc<Session>) };
+
+    let response = tokio::runtime::Runtime::new()
+        .unwrap()
+        .block_on(session.get_balance());
+
+    let response_str = match response {
+        Ok(balance) => serde_json::to_string(&balance).unwrap_or_else(|_| "{}".to_string()),
+        Err(e) => {
+            eprintln!("Error getting balance: {:?}", e);
+            "{}".to_string()
+        }
+    };
+
+    let c_str = std::ffi::CString::new(response_str).unwrap();
+    c_str.into_raw() as *mut c_char
 }
 
 #[no_mangle]

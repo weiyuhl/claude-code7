@@ -19,6 +19,8 @@ use serde::{Deserialize, Serialize};
 pub struct ModelResponse {
     pub id: String,
     pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thinking: Option<String>,
     pub model: String,
     pub usage: Usage,
     #[serde(skip_serializing_if = "Option::is_none")]

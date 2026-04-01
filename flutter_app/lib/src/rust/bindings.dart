@@ -24,8 +24,13 @@ class ClaudeCore {
   late Pointer<Utf8> Function(Pointer<Void> session, Pointer<Utf8> content) _sendMessage;
   late void Function(Pointer<Void> session) _destroySession;
   late Pointer<Utf8> Function(Pointer<Void> session) _getMessages;
+  late Pointer<Utf8> Function(Pointer<Void> session) _listModels;
+  late Pointer<Utf8> Function(Pointer<Void> session) _getBalance;
   late void Function(Pointer<Utf8> s) _freeString;
   late bool Function(Pointer<Void> session, Pointer<Utf8> providerName, Pointer<Utf8> apiKey) _setProvider;
+
+  late int Function(Pointer<Void> session, Pointer<Utf8> content,
+      Pointer<NativeFunction<Void Function(Pointer<Utf8>, Pointer<Void>)>> callback, Pointer<Void> userData) _streamMessage;
 
   ClaudeCore() {
     if (Platform.isAndroid) {
@@ -43,27 +48,39 @@ class ClaudeCore {
     }
 
     _createSession = _lib
-        .lookup<NativeFunction<Pointer<Void> Function(Pointer<Utf8>)>>('claude_create_session')
+        .lookup<NativeFunction<Pointer<Void> Function(Pointer<Utf8>)>>('create_session')
         .asFunction();
 
     _sendMessage = _lib
-        .lookup<NativeFunction<Pointer<Utf8> Function(Pointer<Void>, Pointer<Utf8>)>>('claude_send_message')
+        .lookup<NativeFunction<Pointer<Utf8> Function(Pointer<Void>, Pointer<Utf8>)>>('send_message')
         .asFunction();
 
     _destroySession = _lib
-        .lookup<NativeFunction<Void Function(Pointer<Void>)>>('claude_destroy_session')
+        .lookup<NativeFunction<Void Function(Pointer<Void>)>>('destroy_session')
         .asFunction();
 
     _getMessages = _lib
-        .lookup<NativeFunction<Pointer<Utf8> Function(Pointer<Void>)>>('claude_get_messages')
+        .lookup<NativeFunction<Pointer<Utf8> Function(Pointer<Void>)>>('get_messages')
+        .asFunction();
+
+    _listModels = _lib
+        .lookup<NativeFunction<Pointer<Utf8> Function(Pointer<Void>)>>('list_models')
+        .asFunction();
+
+    _getBalance = _lib
+        .lookup<NativeFunction<Pointer<Utf8> Function(Pointer<Void>)>>('get_balance')
         .asFunction();
 
     _freeString = _lib
-        .lookup<NativeFunction<Void Function(Pointer<Utf8>)>>('claude_free_string')
+        .lookup<NativeFunction<Void Function(Pointer<Utf8>)>>('free_string')
         .asFunction();
 
     _setProvider = _lib
         .lookup<NativeFunction<Bool Function(Pointer<Void>, Pointer<Utf8>, Pointer<Utf8>)>>('set_provider')
+        .asFunction();
+
+    _streamMessage = _lib
+        .lookup<NativeFunction<Int32 Function(Pointer<Void>, Pointer<Utf8>, Pointer<NativeFunction<Void Function(Pointer<Utf8>, Pointer<Void>)>>, Pointer<Void>)>>('stream_message')
         .asFunction();
   }
 
@@ -91,6 +108,28 @@ class ClaudeCore {
     }
   }
 
+  void streamMessage(Pointer<Void> session, String content, void Function(Map<String, dynamic>) onChunk) {
+    final contentPtr = content.toNativeUtf8();
+    
+    final nativeCallable = NativeCallable<Void Function(Pointer<Utf8>, Pointer<Void>)>.listener((Pointer<Utf8> chunkPtr, Pointer<Void> userData) {
+      final chunkStr = chunkPtr.toDartString();
+      try {
+        final chunk = jsonDecode(chunkStr) as Map<String, dynamic>;
+        onChunk(chunk);
+      } catch (e) {
+        // Fallback for non-JSON chunks if any
+        onChunk({"type": "content", "content": chunkStr});
+      }
+    });
+
+    try {
+      _streamMessage(session, contentPtr, nativeCallable.nativeFunction, nullptr);
+    } finally {
+      calloc.free(contentPtr);
+      nativeCallable.close();
+    }
+  }
+
   void destroySession(Pointer<Void> session) {
     _destroySession(session);
   }
@@ -99,6 +138,26 @@ class ClaudeCore {
     final resultPtr = _getMessages(session);
     try {
       return resultPtr.toDartString();
+    } finally {
+      _freeString(resultPtr);
+    }
+  }
+
+  List<dynamic> listModels(Pointer<Void> session) {
+    final resultPtr = _listModels(session);
+    try {
+      final jsonStr = resultPtr.toDartString();
+      return jsonDecode(jsonStr) as List<dynamic>;
+    } finally {
+      _freeString(resultPtr);
+    }
+  }
+
+  Map<String, dynamic> getBalance(Pointer<Void> session) {
+    final resultPtr = _getBalance(session);
+    try {
+      final jsonStr = resultPtr.toDartString();
+      return jsonDecode(jsonStr) as Map<String, dynamic>;
     } finally {
       _freeString(resultPtr);
     }

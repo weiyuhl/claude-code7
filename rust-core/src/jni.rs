@@ -81,7 +81,15 @@ pub extern "system" fn Java_com_example_claude_ClaudeCore_nativeSendMessage(
         Err(e) => serde_json::to_string(&e).unwrap_or_else(|_| r#"{"error":"unknown"}"#.to_string()),
     };
 
-    let assistant_message = Message::assistant(&response_str);
+    let assistant_message = if let Ok(val) = serde_json::from_str::<serde_json::Value>(&response_str) {
+        let content = val.get("content").and_then(|v| v.as_str()).unwrap_or(&response_str).to_string();
+        let thinking = val.get("thinking").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let mut msg = Message::assistant(content);
+        msg.thinking = thinking;
+        msg
+    } else {
+        Message::assistant(&response_str)
+    };
 
     {
         let mut messages = session_ref.messages.write();
@@ -203,7 +211,15 @@ pub extern "system" fn Java_com_example_claude_ClaudeCore_nativeStreamMessage(
         Err(e) => serde_json::to_string(&e).unwrap_or_else(|_| r#"{"error":"unknown"}"#.to_string()),
     };
 
-    let assistant_message = Message::assistant(&response_str);
+    let assistant_message = if let Ok(val) = serde_json::from_str::<serde_json::Value>(&response_str) {
+        let content = val.get("content").and_then(|v| v.as_str()).unwrap_or(&response_str).to_string();
+        let thinking = val.get("thinking").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let mut msg = Message::assistant(content);
+        msg.thinking = thinking;
+        msg
+    } else {
+        Message::assistant(&response_str)
+    };
 
     {
         let mut messages = session_ref.messages.write();
@@ -211,5 +227,57 @@ pub extern "system" fn Java_com_example_claude_ClaudeCore_nativeStreamMessage(
     }
 
     std::mem::forget(session_ref);
+    jstring_from_string(&mut env, response_str)
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_example_claude_ClaudeCore_nativeListModels(
+    mut env: JNIEnv,
+    _class: JClass,
+    session_ptr: jlong,
+) -> jstring {
+    if session_ptr == 0 {
+        return jstring_from_string(&mut env, "[]".to_string());
+    }
+
+    let session_arc = unsafe { Arc::from_raw(session_ptr as *const Session) };
+    let session = &session_arc;
+
+    let response = tokio::runtime::Runtime::new()
+        .unwrap()
+        .block_on(session.list_models());
+
+    let response_str = match response {
+        Ok(models) => serde_json::to_string(&models).unwrap_or_else(|_| "[]".to_string()),
+        Err(_) => "[]".to_string(),
+    };
+
+    std::mem::forget(session_arc);
+    jstring_from_string(&mut env, response_str)
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_example_claude_ClaudeCore_nativeGetBalance(
+    mut env: JNIEnv,
+    _class: JClass,
+    session_ptr: jlong,
+) -> jstring {
+    if session_ptr == 0 {
+        return jstring_from_string(&mut env, "{}".to_string());
+    }
+
+    let session_arc = unsafe { Arc::from_raw(session_ptr as *const Session) };
+    let session = &session_arc;
+
+    let response = tokio::runtime::Runtime::new()
+        .unwrap()
+        .block_on(session.get_balance());
+
+    let response_str = match response {
+        Ok(balance) => serde_json::to_string(&balance).unwrap_or_else(|_| "{}".to_string()),
+        Err(_) => "{}".to_string(),
+    };
+
+    std::mem::forget(session_arc);
     jstring_from_string(&mut env, response_str)
 }

@@ -27,7 +27,13 @@ impl QueryEngine {
             session.config.max_tokens,
         ).await?;
 
-        Ok(response.content)
+        // Return JSON string instead of just content to support thinking
+        let result = serde_json::json!({
+            "content": response.content,
+            "thinking": response.thinking,
+        });
+
+        Ok(result.to_string())
     }
 
     pub async fn execute_streaming_query(
