@@ -164,7 +164,6 @@ class ClaudeCore {
             final chunk = jsonDecode(chunkStr) as Map<String, dynamic>;
             onChunk(chunk);
           } catch (e) {
-            // Fallback for non-JSON chunks if any
             onChunk({"type": "content", "content": chunkStr});
           }
         });
