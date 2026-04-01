@@ -739,9 +739,9 @@ class _SettingsPageState extends State<SettingsPage> {
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               value: currentModels.isNotEmpty ? _selectedModel : null,
+              isExpanded: true,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.model_training_outlined),
                 hintText: '请先获取模型列表',
               ),
               items: currentModels.map((m) {
