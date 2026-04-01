@@ -123,32 +123,41 @@ class _ChatPageState extends State<ChatPage> {
 
     final config = {
       'provider': _currentProvider,
-      'model': '',
+      'model': _currentModel.isEmpty ? 'auto' : _currentModel,
       'max_tokens': 4096,
     };
 
     _session = _claudeCore!.createSession(config);
-    _refreshInfo();
+    if (_session == nullptr) {
+      _showError('创建会话失败');
+      return;
+    }
+
+    final apiKey = _apiKeys[_currentProvider] ?? '';
+    if (apiKey.isNotEmpty) {
+      _claudeCore!.setProvider(_session!, _currentProvider, apiKey);
+      _refreshInfo();
+    }
   }
 
   Future<void> _refreshInfo() async {
-    if (_session == null || _claudeCore == null) return;
+    if (_session == null || _session == nullptr || _claudeCore == null) return;
 
     final apiKey = _apiKeys[_currentProvider] ?? '';
     if (apiKey.isEmpty) return;
-
-    _claudeCore!.setProvider(_session!, _currentProvider, apiKey);
 
     try {
       final modelsList = _claudeCore!.listModels(_session!);
       if (modelsList.isNotEmpty) {
         final modelIds = modelsList.map((m) => m['id'].toString()).toList();
-        setState(() {
-          _models[_currentProvider] = modelIds;
-          if (_currentModel.isEmpty && modelIds.isNotEmpty) {
-            _currentModel = modelIds.first;
-          }
-        });
+        if (mounted) {
+          setState(() {
+            _models[_currentProvider] = modelIds;
+            if (_currentModel.isEmpty && modelIds.isNotEmpty) {
+              _currentModel = modelIds.first;
+            }
+          });
+        }
       }
     } catch (e) {
       print('获取模型列表失败：$e');
@@ -156,9 +165,11 @@ class _ChatPageState extends State<ChatPage> {
 
     try {
       final balanceInfo = _claudeCore!.getBalance(_session!);
-      setState(() {
-        _balance = balanceInfo;
-      });
+      if (mounted) {
+        setState(() {
+          _balance = balanceInfo;
+        });
+      }
     } catch (e) {
       print('获取余额失败：$e');
     }
@@ -184,15 +195,14 @@ class _ChatPageState extends State<ChatPage> {
 
   void _sendMessage() {
     final text = _messageController.text.trim();
-    if (text.isEmpty || _isStreaming || _session == null) return;
+    if (text.isEmpty || _isStreaming || _session == null || _session == nullptr)
+      return;
 
     final apiKey = _apiKeys[_currentProvider] ?? '';
     if (apiKey.isEmpty) {
       _showError('请先在配置中心设置 API Key');
       return;
     }
-
-    _claudeCore!.setProvider(_session!, _currentProvider, apiKey);
 
     setState(() {
       _messages.add({'role': 'user', 'content': text});
@@ -231,14 +241,18 @@ class _ChatPageState extends State<ChatPage> {
         }
       });
 
-      setState(() {
-        _isStreaming = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isStreaming = false;
+        });
+      }
     } catch (e) {
       _showError('发送失败: $e');
-      setState(() {
-        _isStreaming = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isStreaming = false;
+        });
+      }
     }
   }
 
@@ -615,6 +629,13 @@ class _SettingsPageState extends State<SettingsPage> {
 
     // 保存 API Key
     widget.apiKeys[_selectedProvider] = apiKey;
+
+    // 设置 provider 到新 session
+    if (widget.claudeCore != null &&
+        _tempSession != null &&
+        _tempSession != nullptr) {
+      widget.claudeCore!.setProvider(_tempSession!, _selectedProvider, apiKey);
+    }
 
     // 回调通知父页面
     widget.onSettingsChanged(_selectedProvider, _selectedModel);
