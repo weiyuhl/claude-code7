@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'src/rust/bindings.dart';
 import 'dart:ffi';
 import 'dart:convert';
@@ -8,7 +7,6 @@ void main() {
   runApp(const MyApp());
 }
 
-// 全局状态管理
 class AppState {
   static final AppState _instance = AppState._internal();
   factory AppState() => _instance;
@@ -41,20 +39,125 @@ class MyApp extends StatelessWidget {
       title: 'Jasmine AI',
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6366F1), // Indigo
-          brightness: Brightness.light,
+        colorScheme: ColorScheme.light(
+          primary: const Color(0xFF007AFF),
+          secondary: const Color(0xFF5856D6),
+          surface: const Color(0xFFF5F5F7),
+          onSurface: const Color(0xFF1D1D1F),
+          onSurfaceVariant: const Color(0xFF86868B),
+          outline: const Color(0xFFD2D2D7),
+          outlineVariant: const Color(0xFFE5E5EA),
         ),
-        textTheme: GoogleFonts.outfitTextTheme(),
+        textTheme: const TextTheme(
+          headlineLarge: TextStyle(
+            fontSize: 34,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.5,
+            color: Color(0xFF1D1D1F),
+          ),
+          headlineMedium: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.3,
+            color: Color(0xFF1D1D1F),
+          ),
+          titleLarge: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.3,
+            color: Color(0xFF1D1D1F),
+          ),
+          bodyLarge: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w400,
+            letterSpacing: -0.4,
+            color: Color(0xFF1D1D1F),
+          ),
+          bodyMedium: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w400,
+            letterSpacing: -0.2,
+            color: Color(0xFF1D1D1F),
+          ),
+          bodySmall: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w400,
+            letterSpacing: -0.1,
+            color: Color(0xFF86868B),
+          ),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFFF5F5F7),
+          elevation: 0,
+          centerTitle: true,
+          titleTextStyle: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1D1D1F),
+            letterSpacing: -0.4,
+          ),
+        ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6366F1),
-          brightness: Brightness.dark,
-          surface: const Color(0xFF0F172A),
+        colorScheme: ColorScheme.dark(
+          primary: const Color(0xFF0A84FF),
+          secondary: const Color(0xFF5E5CE6),
+          surface: const Color(0xFF000000),
+          onSurface: const Color(0xFFF5F5F7),
+          onSurfaceVariant: const Color(0xFF8E8E93),
+          outline: const Color(0xFF38383A),
+          outlineVariant: const Color(0xFF2C2C2E),
         ),
-        textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme),
+        textTheme: const TextTheme(
+          headlineLarge: TextStyle(
+            fontSize: 34,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.5,
+            color: Color(0xFFF5F5F7),
+          ),
+          headlineMedium: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.3,
+            color: Color(0xFFF5F5F7),
+          ),
+          titleLarge: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.3,
+            color: Color(0xFFF5F5F7),
+          ),
+          bodyLarge: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w400,
+            letterSpacing: -0.4,
+            color: Color(0xFFF5F5F7),
+          ),
+          bodyMedium: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w400,
+            letterSpacing: -0.2,
+            color: Color(0xFFF5F5F7),
+          ),
+          bodySmall: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w400,
+            letterSpacing: -0.1,
+            color: Color(0xFF8E8E93),
+          ),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF000000),
+          elevation: 0,
+          centerTitle: true,
+          titleTextStyle: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFFF5F5F7),
+            letterSpacing: -0.4,
+          ),
+        ),
       ),
       themeMode: ThemeMode.system,
       home: const ChatPage(),
@@ -79,7 +182,6 @@ class _ChatPageState extends State<ChatPage> {
   String _currentProvider = 'openrouter';
   String _currentModel = '';
 
-  // API Keys
   final Map<String, String> _apiKeys = {
     'openrouter': '',
     'deepseek': '',
@@ -177,7 +279,12 @@ class _ChatPageState extends State<ChatPage> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFFF3B30),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
     );
   }
 
@@ -200,7 +307,7 @@ class _ChatPageState extends State<ChatPage> {
 
     final apiKey = _apiKeys[_currentProvider] ?? '';
     if (apiKey.isEmpty) {
-      _showError('请先在配置中心设置 API Key');
+      _showError('请先在设置中配置 API Key');
       return;
     }
 
@@ -268,20 +375,17 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: isDark
+          ? const Color(0xFF000000)
+          : const Color(0xFFF5F5F7),
       appBar: AppBar(
-        title: Text(
-          'Jasmine AI',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
-        ),
-        elevation: 0,
-        backgroundColor: Colors.transparent,
+        title: const Text('Jasmine AI'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings_outlined),
+            icon: const Icon(Icons.settings, size: 22),
             onPressed: _showSettings,
           ),
           const SizedBox(width: 8),
@@ -310,82 +414,77 @@ class _ChatPageState extends State<ChatPage> {
                     },
                   ),
           ),
-          _buildInputArea(colorScheme),
+          _buildInputArea(),
         ],
       ),
     );
   }
 
   Widget _buildEmptyState() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.primaryContainer.withOpacity(0.3),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.auto_awesome,
-              size: 64,
-              color: Theme.of(context).colorScheme.primary,
-            ),
+          Icon(
+            Icons.chat_bubble_outline,
+            size: 72,
+            color: isDark ? const Color(0xFF8E8E93) : const Color(0xFFC7C7CC),
           ),
-          const SizedBox(height: 24),
-          Text(
+          const SizedBox(height: 16),
+          const Text(
             '有什么可以帮您的？',
-            style: GoogleFonts.outfit(
+            style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w600,
+              letterSpacing: -0.3,
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            '切换设置来更改模型或供应商',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+          const Text(
+            '点击右上角设置来配置 API',
+            style: TextStyle(fontSize: 15, color: Color(0xFF86868B)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildInputArea(ColorScheme colorScheme) {
+  Widget _buildInputArea() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+      color: isDark ? const Color(0xFF000000) : const Color(0xFFF5F5F7),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: colorScheme.surfaceVariant.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: colorScheme.outlineVariant),
+                color: isDark
+                    ? const Color(0xFF1C1C1E)
+                    : const Color(0xFFFFFFFF),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isDark
+                      ? const Color(0xFF38383A)
+                      : const Color(0xFFD2D2D7),
+                  width: 0.5,
+                ),
               ),
               child: TextField(
                 controller: _messageController,
                 maxLines: 5,
                 minLines: 1,
+                style: const TextStyle(fontSize: 16),
                 decoration: const InputDecoration(
                   hintText: '输入消息...',
+                  hintStyle: TextStyle(color: Color(0xFF86868B), fontSize: 16),
                   contentPadding: EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
+                    horizontal: 16,
+                    vertical: 10,
                   ),
                   border: InputBorder.none,
                 ),
@@ -396,16 +495,22 @@ class _ChatPageState extends State<ChatPage> {
           GestureDetector(
             onTap: _isStreaming ? null : _sendMessage,
             child: Container(
-              width: 48,
-              height: 48,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                color: _isStreaming ? colorScheme.outline : colorScheme.primary,
+                color: _isStreaming
+                    ? (isDark
+                          ? const Color(0xFF38383A)
+                          : const Color(0xFFD2D2D7))
+                    : const Color(0xFF007AFF),
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                _isStreaming ? Icons.hourglass_empty : Icons.send_rounded,
-                color: colorScheme.onPrimary,
-                size: 20,
+                _isStreaming ? Icons.hourglass_empty : Icons.arrow_upward,
+                color: isDark
+                    ? const Color(0xFF8E8E93)
+                    : const Color(0xFFFFFFFF),
+                size: 18,
               ),
             ),
           ),
@@ -627,17 +732,14 @@ class _SettingsPageState extends State<SettingsPage> {
       return;
     }
 
-    // 保存 API Key
     widget.apiKeys[_selectedProvider] = apiKey;
 
-    // 设置 provider 到新 session
     if (widget.claudeCore != null &&
         _tempSession != null &&
         _tempSession != nullptr) {
       widget.claudeCore!.setProvider(_tempSession!, _selectedProvider, apiKey);
     }
 
-    // 回调通知父页面
     widget.onSettingsChanged(_selectedProvider, _selectedModel);
 
     _showSnackBar('设置已保存');
@@ -648,7 +750,11 @@ class _SettingsPageState extends State<SettingsPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? Colors.redAccent : Colors.green,
+        backgroundColor: isError
+            ? const Color(0xFFFF3B30)
+            : const Color(0xFF34C759),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -656,32 +762,28 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final currentModels = _models[_selectedProvider] ?? [];
 
     return Scaffold(
+      backgroundColor: isDark
+          ? const Color(0xFF000000)
+          : const Color(0xFFF5F5F7),
       appBar: AppBar(
-        title: Text(
-          '供应商配置',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
-        ),
-        elevation: 0,
-        backgroundColor: Colors.transparent,
+        title: const Text('供应商配置'),
+        backgroundColor: isDark
+            ? const Color(0xFF000000)
+            : const Color(0xFFF5F5F7),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 供应商选择
             _buildSectionTitle('供应商'),
             const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
+            _buildDropdown(
               value: _selectedProvider,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.cloud_outlined),
-              ),
               items: widget.providers.map((p) {
                 return DropdownMenuItem(value: p, child: Text(p.toUpperCase()));
               }).toList(),
@@ -698,52 +800,48 @@ class _SettingsPageState extends State<SettingsPage> {
 
             const SizedBox(height: 24),
 
-            // API Key 输入
             _buildSectionTitle('API Key'),
             const SizedBox(height: 8),
-            TextField(
+            _buildTextField(
               controller: _apiKeyController,
+              hintText: '输入您的 API Key',
               obscureText: true,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.key_outlined),
-                hintText: '输入您的 API Key',
-              ),
             ),
 
             const SizedBox(height: 24),
 
-            // 获取模型列表按钮
             SizedBox(
               width: double.infinity,
-              child: OutlinedButton.icon(
+              height: 48,
+              child: ElevatedButton.icon(
                 onPressed: _isLoadingModels ? null : _fetchModels,
                 icon: _isLoadingModels
                     ? const SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
-                    : const Icon(Icons.refresh),
+                    : const Icon(Icons.refresh, size: 18),
                 label: Text(_isLoadingModels ? '获取中...' : '获取模型列表'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF007AFF),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
 
             const SizedBox(height: 16),
 
-            // 模型选择
             _buildSectionTitle('模型'),
             const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
+            _buildDropdown(
               value: currentModels.isNotEmpty ? _selectedModel : null,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: '请先获取模型列表',
-              ),
               items: currentModels.map((m) {
                 return DropdownMenuItem(
                   value: m,
@@ -759,43 +857,62 @@ class _SettingsPageState extends State<SettingsPage> {
                       }
                     }
                   : null,
+              hintText: '请先获取模型列表',
             ),
 
             const SizedBox(height: 24),
 
-            // 获取余额按钮
             SizedBox(
               width: double.infinity,
-              child: OutlinedButton.icon(
+              height: 48,
+              child: ElevatedButton.icon(
                 onPressed: _isLoadingBalance ? null : _fetchBalance,
                 icon: _isLoadingBalance
                     ? const SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
-                    : const Icon(Icons.account_balance_wallet_outlined),
+                    : const Icon(Icons.account_balance_wallet, size: 18),
                 label: Text(_isLoadingBalance ? '获取中...' : '获取余额'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF007AFF),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
 
             const SizedBox(height: 16),
 
-            // 余额显示
             if (_balance.isNotEmpty)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withOpacity(0.4),
+                  color: isDark
+                      ? const Color(0xFF1C1C1E)
+                      : const Color(0xFFFFFFFF),
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDark
+                        ? const Color(0xFF38383A)
+                        : const Color(0xFFE5E5EA),
+                    width: 0.5,
+                  ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.account_balance_wallet_outlined, size: 24),
+                    const Icon(
+                      Icons.account_balance_wallet,
+                      size: 20,
+                      color: Color(0xFF007AFF),
+                    ),
                     const SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -803,15 +920,17 @@ class _SettingsPageState extends State<SettingsPage> {
                         Text(
                           '当前余额',
                           style: TextStyle(
-                            fontSize: 12,
-                            color: colorScheme.onSurfaceVariant,
+                            fontSize: 13,
+                            color: isDark
+                                ? const Color(0xFF8E8E93)
+                                : const Color(0xFF86868B),
                           ),
                         ),
                         Text(
                           '${_balance['total_balance'] ?? '0'} ${_balance['currency'] ?? ''}',
                           style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
@@ -822,17 +941,19 @@ class _SettingsPageState extends State<SettingsPage> {
 
             const SizedBox(height: 32),
 
-            // 保存按钮
             SizedBox(
               width: double.infinity,
               height: 48,
               child: ElevatedButton.icon(
                 onPressed: _saveSettings,
-                icon: const Icon(Icons.save_outlined),
+                icon: const Icon(Icons.save, size: 18),
                 label: const Text('保存设置'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: colorScheme.onPrimary,
+                  backgroundColor: const Color(0xFF34C759),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
@@ -845,7 +966,91 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
-      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+      style: const TextStyle(
+        fontSize: 15,
+        fontWeight: FontWeight.w500,
+        color: Color(0xFF86868B),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    String? hintText,
+    bool obscureText = false,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFFFFFFF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? const Color(0xFF38383A) : const Color(0xFFD2D2D7),
+          width: 0.5,
+        ),
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: obscureText,
+        style: TextStyle(
+          fontSize: 16,
+          color: isDark ? const Color(0xFFF5F5F7) : const Color(0xFF1D1D1F),
+        ),
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: const TextStyle(color: Color(0xFF86868B), fontSize: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
+          border: InputBorder.none,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDropdown({
+    required String? value,
+    required List<DropdownMenuItem<String>> items,
+    void Function(String?)? onChanged,
+    String? hintText,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFFFFFFF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? const Color(0xFF38383A) : const Color(0xFFD2D2D7),
+          width: 0.5,
+        ),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButtonFormField<String>(
+          value: value,
+          isExpanded: true,
+          decoration: InputDecoration(
+            hintText: hintText,
+            hintStyle: const TextStyle(color: Color(0xFF86868B), fontSize: 16),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 4,
+            ),
+            border: InputBorder.none,
+          ),
+          items: items,
+          onChanged: onChanged,
+          style: TextStyle(
+            fontSize: 16,
+            color: isDark ? const Color(0xFFF5F5F7) : const Color(0xFF1D1D1F),
+          ),
+          dropdownColor: isDark
+              ? const Color(0xFF1C1C1E)
+              : const Color(0xFFFFFFFF),
+        ),
+      ),
     );
   }
 }
@@ -865,10 +1070,10 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         mainAxisAlignment: isUser
             ? MainAxisAlignment.end
@@ -876,15 +1081,12 @@ class _MessageBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isUser) ...[
-            CircleAvatar(
-              backgroundColor: colorScheme.primaryContainer,
-              child: Icon(
-                Icons.smart_toy_outlined,
-                size: 20,
-                color: colorScheme.primary,
-              ),
+            const CircleAvatar(
+              radius: 16,
+              backgroundColor: Color(0xFF007AFF),
+              child: Icon(Icons.auto_awesome, size: 16, color: Colors.white),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
           ],
           Flexible(
             child: Column(
@@ -899,53 +1101,56 @@ class _MessageBubble extends StatelessWidget {
                 if (content.isNotEmpty)
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
+                      horizontal: 14,
+                      vertical: 10,
                     ),
                     decoration: BoxDecoration(
                       color: isUser
-                          ? colorScheme.primary
-                          : colorScheme.surfaceVariant,
+                          ? const Color(0xFF007AFF)
+                          : (isDark
+                                ? const Color(0xFF1C1C1E)
+                                : const Color(0xFFFFFFFF)),
                       borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(16),
-                        topRight: const Radius.circular(16),
+                        topLeft: const Radius.circular(18),
+                        topRight: const Radius.circular(18),
                         bottomLeft: isUser
-                            ? const Radius.circular(16)
+                            ? const Radius.circular(18)
                             : Radius.zero,
                         bottomRight: isUser
                             ? Radius.zero
-                            : const Radius.circular(16),
+                            : const Radius.circular(18),
                       ),
                     ),
                     child: Text(
                       content,
                       style: TextStyle(
-                        color: isUser
-                            ? colorScheme.onPrimary
-                            : colorScheme.onSurfaceVariant,
+                        color: isUser ? Colors.white : null,
                         fontSize: 16,
-                        height: 1.4,
+                        height: 1.45,
                       ),
                     ),
                   ),
               ],
             ),
           ),
-          if (isUser) const SizedBox(width: 44),
+          if (isUser) const SizedBox(width: 32),
         ],
       ),
     );
   }
 
   Widget _buildThinkingBlock(BuildContext context, String text) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.4),
+        color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF5F5F7),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.5),
+          color: isDark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA),
+          width: 0.5,
         ),
       ),
       child: Column(
@@ -953,31 +1158,29 @@ class _MessageBubble extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.psychology_outlined,
-                size: 16,
-                color: Theme.of(context).colorScheme.primary,
+                size: 14,
+                color: Color(0xFF5856D6),
               ),
-              const SizedBox(width: 8),
-              Text(
+              const SizedBox(width: 6),
+              const Text(
                 '思考中...',
-                style: GoogleFonts.outfit(
+                style: TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF5856D6),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             text,
             style: TextStyle(
               fontSize: 14,
               fontStyle: FontStyle.italic,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurfaceVariant.withOpacity(0.7),
+              color: isDark ? const Color(0xFF8E8E93) : const Color(0xFF86868B),
             ),
           ),
         ],
@@ -990,9 +1193,9 @@ class _MessageBubble extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.amber.withOpacity(0.1),
+        color: const Color(0xFFFFCC00).withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.amber.withOpacity(0.3)),
+        border: Border.all(color: const Color(0xFFFFCC00).withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1001,22 +1204,22 @@ class _MessageBubble extends StatelessWidget {
             children: [
               const Icon(
                 Icons.build_circle_outlined,
-                size: 16,
-                color: Colors.amber,
+                size: 14,
+                color: Color(0xFFFFCC00),
               ),
-              const SizedBox(width: 8),
-              Text(
+              const SizedBox(width: 6),
+              const Text(
                 '调用工具',
-                style: GoogleFonts.outfit(
+                style: TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.amber,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFFFFCC00),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 4),
-          Text(toolUse.toString(), style: GoogleFonts.firaCode(fontSize: 12)),
+          Text(toolUse.toString(), style: const TextStyle(fontSize: 12)),
         ],
       ),
     );
