@@ -1,5 +1,5 @@
 use crate::api::providers::{Provider, ModelResponse, Usage, ModelInfo, BalanceInfo};
-use crate::message::Message;
+use crate::message::{Message, normalize_messages_for_api, ApiMessage};
 use crate::session::ClaudeError;
 use async_trait::async_trait;
 use reqwest::Client;
@@ -53,18 +53,12 @@ impl Clone for OpenRouterProvider {
 #[derive(Serialize)]
 struct ChatCompletionRequest<'a> {
     model: &'a str,
-    messages: Vec<ChatMessage<'a>>,
+    messages: Vec<ApiMessage>,
     #[serde(skip_serializing_if = "Option::is_none")]
     max_tokens: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     temperature: Option<f32>,
     stream: bool,
-}
-
-#[derive(Serialize)]
-struct ChatMessage<'a> {
-    role: &'a str,
-    content: &'a str,
 }
 
 #[derive(Deserialize)]
@@ -122,15 +116,11 @@ impl Provider for OpenRouterProvider {
         messages: &[&Message],
         max_tokens: usize,
     ) -> Result<ModelResponse, ClaudeError> {
+        let api_messages = normalize_messages_for_api(messages);
+
         let request = ChatCompletionRequest {
             model,
-            messages: messages
-                .iter()
-                .map(|m| ChatMessage {
-                    role: m.role.as_str(),
-                    content: &m.content,
-                })
-                .collect(),
+            messages: api_messages,
             max_tokens: Some(max_tokens),
             temperature: None,
             stream: false,
@@ -189,15 +179,11 @@ impl Provider for OpenRouterProvider {
         max_tokens: usize,
         callback: &mut (dyn FnMut(String) + Send),
     ) -> Result<String, ClaudeError> {
+        let api_messages = normalize_messages_for_api(messages);
+
         let request = ChatCompletionRequest {
             model,
-            messages: messages
-                .iter()
-                .map(|m| ChatMessage {
-                    role: m.role.as_str(),
-                    content: &m.content,
-                })
-                .collect(),
+            messages: api_messages,
             max_tokens: Some(max_tokens),
             temperature: None,
             stream: true,
@@ -217,9 +203,10 @@ impl Provider for OpenRouterProvider {
 
         if !response.status().is_success() {
             let status = response.status();
+            let body = response.text().await.unwrap_or_default();
             return Err(ClaudeError::ApiError {
                 provider: "openrouter".to_string(),
-                message: format!("HTTP {}", status),
+                message: format!("HTTP {} - {}", status, body),
             });
         }
 
@@ -245,9 +232,30 @@ impl Provider for OpenRouterProvider {
                                 return Ok(full_response);
                             }
                             
+                            // Try parsing as SSE event first
                             if let Ok(event) = serde_json::from_str::<SSEEvent>(data) {
                                 if let Some(choices) = &event.choices {
                                     if let Some(first_choice) = choices.get(0) {
+                                        // Check for finish reason with error
+                                        if let Some(finish_reason) = &first_choice.finish_reason {
+                                            if finish_reason == "error" || finish_reason == "length" {
+                                                let error_msg = first_choice.delta.content.as_deref()
+                                                    .unwrap_or_else(|| {
+                                                        static FALLBACK: &str = "Stream ended unexpectedly";
+                                                        FALLBACK
+                                                    });
+                                                let chunk = serde_json::json!({
+                                                    "type": "error",
+                                                    "content": error_msg
+                                                });
+                                                callback(chunk.to_string());
+                                                return Err(ClaudeError::ApiError {
+                                                    provider: "openrouter".to_string(),
+                                                    message: error_msg.to_string(),
+                                                });
+                                            }
+                                        }
+
                                         let delta = &first_choice.delta;
                                         
                                         if let Some(content) = &delta.content {
@@ -268,7 +276,7 @@ impl Provider for OpenRouterProvider {
                                             callback(chunk.to_string());
                                         }
                                         
-                                        // Tool use delta (this is a simplified implementation)
+                                        // Tool use delta
                                         if let Some(tool_calls) = &delta.tool_calls {
                                             let chunk = serde_json::json!({
                                                 "type": "tool_use",
@@ -278,6 +286,17 @@ impl Provider for OpenRouterProvider {
                                         }
                                     }
                                 }
+                            } else if let Ok(error) = serde_json::from_str::<SSEError>(data) {
+                                // Handle explicit error events in SSE stream
+                                let chunk = serde_json::json!({
+                                    "type": "error",
+                                    "content": &error.error.message
+                                });
+                                callback(chunk.to_string());
+                                return Err(ClaudeError::ApiError {
+                                    provider: "openrouter".to_string(),
+                                    message: error.error.message,
+                                });
                             }
                         }
                     }
@@ -419,6 +438,7 @@ struct SSEEvent {
 #[derive(Deserialize)]
 struct SSEDelta {
     delta: DeltaContent,
+    finish_reason: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -429,4 +449,16 @@ struct DeltaContent {
     reasoning_content: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_calls: Option<serde_json::Value>,
+}
+
+#[derive(Deserialize)]
+struct SSEError {
+    error: SSEErrorDetail,
+}
+
+#[derive(Deserialize)]
+struct SSEErrorDetail {
+    message: String,
+    #[serde(default)]
+    code: Option<String>,
 }

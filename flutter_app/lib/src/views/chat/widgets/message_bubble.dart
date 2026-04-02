@@ -153,9 +153,9 @@ class ToolUseBlock extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.warningColor.withOpacity(0.1),
+        color: AppTheme.warningColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.warningColor.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.warningColor.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

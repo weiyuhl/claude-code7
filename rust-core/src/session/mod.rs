@@ -1,10 +1,12 @@
 mod error;
 mod config;
 mod storage;
+mod config_manager;
 
 pub use error::*;
 pub use config::*;
 pub use storage::{SessionStorage, PersistentSessionManager};
+pub use config_manager::{ConfigManager, GlobalConfig, ProjectConfig, ConfigError};
 
 use std::ffi::{c_char, c_void};
 use std::sync::Arc;

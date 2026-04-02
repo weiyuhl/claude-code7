@@ -25,27 +25,54 @@ class _ProviderConfigPageState extends ConsumerState<ProviderConfigPage>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 每次页面显示时重新加载 API Key
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final state = ref.read(settingsNotifierProvider);
+        _apiKeyController.text = state.apiKey;
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _tabController.dispose();
     _apiKeyController.dispose();
-    ref.read(settingsNotifierProvider.notifier).dispose();
+    // Don't destroy temp session here — it's managed by SettingsNotifier
+    // and may be needed when the user returns to this page
     super.dispose();
   }
 
-  void _saveSettings() {
+  void _saveSettings() async {
     final apiKey = _apiKeyController.text.trim();
     if (apiKey.isEmpty) {
       _showSnackBar('请输入 API Key', isError: true);
       return;
     }
 
-    final state = ref.read(settingsNotifierProvider);
-    final chatNotifier = ref.read(chatNotifierProvider.notifier);
-    chatNotifier.updateApiKey(state.selectedProvider, apiKey);
-    chatNotifier.updateProvider(state.selectedProvider);
+    try {
+      final state = ref.read(settingsNotifierProvider);
+      final settingsNotifier = ref.read(settingsNotifierProvider.notifier);
+      final chatNotifier = ref.read(chatNotifierProvider.notifier);
 
-    _showSnackBar('设置已保存');
-    Navigator.pop(context);
+      // 保存到数据库
+      await settingsNotifier.saveApiKey(state.selectedProvider, apiKey);
+
+      // 更新 ChatViewModel 中的 API Key
+      chatNotifier.updateApiKey(state.selectedProvider, apiKey);
+      chatNotifier.updateProvider(state.selectedProvider);
+
+      if (mounted) {
+        _showSnackBar('设置已保存');
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        _showSnackBar('保存失败：$e', isError: true);
+      }
+    }
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
@@ -107,7 +134,6 @@ class _ProviderConfigTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(settingsNotifierProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -232,7 +258,7 @@ class _ProviderConfigTab extends ConsumerWidget {
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButtonFormField<String>(
-          value: value,
+          initialValue: value,
           isExpanded: true,
           decoration: InputDecoration(
             hintText: hintText,

@@ -13,10 +13,14 @@ pub struct SessionStorage {
 impl SessionStorage {
     pub fn new(storage_dir: &str) -> Self {
         let path = PathBuf::from(storage_dir);
+        eprintln!("🔵 [Rust] SessionStorage::new: storage_dir = {:?}", path);
         if !path.exists() {
-            fs::create_dir_all(&path).unwrap_or_else(|_| {
-                eprintln!("Failed to create storage directory: {}", storage_dir);
-            });
+            match fs::create_dir_all(&path) {
+                Ok(_) => eprintln!("✅ [Rust] SessionStorage::new: 成功创建目录 {:?}", path),
+                Err(e) => eprintln!("❌ [Rust] SessionStorage::new: 创建目录失败 {:?}, 错误：{}", path, e),
+            }
+        } else {
+            eprintln!("✅ [Rust] SessionStorage::new: 目录已存在 {:?}", path);
         }
         Self {
             storage_dir: path,
@@ -26,6 +30,8 @@ impl SessionStorage {
     pub fn save_session(&self, session: &Session) -> Result<(), ClaudeError> {
         let file_path = self.storage_dir.join(format!("{}.json", session.id));
         
+        eprintln!("🔵 [Rust] save_session: 尝试保存到 {:?}", file_path);
+        
         let messages = session.messages.read();
         let session_data = serde_json::json!({
             "id": session.id,
@@ -33,19 +39,30 @@ impl SessionStorage {
             "messages": *messages,
         });
         
-        let json_str = serde_json::to_string_pretty(&session_data)
-            .map_err(|e| ClaudeError::IoError {
-                path: file_path.to_string_lossy().to_string(),
-                message: e.to_string(),
-            })?;
+        let json_str = match serde_json::to_string_pretty(&session_data) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("❌ [Rust] save_session: serde_json 序列化失败：{}", e);
+                return Err(ClaudeError::IoError {
+                    path: file_path.to_string_lossy().to_string(),
+                    message: e.to_string(),
+                });
+            }
+        };
         
-        fs::write(&file_path, json_str)
-            .map_err(|e| ClaudeError::IoError {
-                path: file_path.to_string_lossy().to_string(),
-                message: e.to_string(),
-            })?;
-        
-        Ok(())
+        match fs::write(&file_path, json_str) {
+            Ok(_) => {
+                eprintln!("✅ [Rust] save_session: 成功保存到 {:?}", file_path);
+                Ok(())
+            }
+            Err(e) => {
+                eprintln!("❌ [Rust] save_session: fs::write 失败：{}, 路径：{:?}", e, file_path);
+                Err(ClaudeError::IoError {
+                    path: file_path.to_string_lossy().to_string(),
+                    message: e.to_string(),
+                })
+            }
+        }
     }
 
     pub fn load_session(&self, session_id: &str) -> Result<Option<Session>, ClaudeError> {

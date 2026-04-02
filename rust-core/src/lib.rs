@@ -2,6 +2,7 @@ mod api;
 mod engine;
 mod message;
 mod session;
+pub mod db;
 
 pub use api::*;
 pub use engine::*;

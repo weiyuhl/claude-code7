@@ -1,6 +1,7 @@
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:ffi/ffi.dart';
 
 final calloc = _Calloc();
@@ -20,6 +21,7 @@ class _Calloc implements Allocator {
 class ClaudeCore {
   late DynamicLibrary _lib;
 
+  late int Function(Pointer<Utf8> dbPath) _initDatabase;
   late Pointer<Void> Function(Pointer<Utf8> configJson) _createSession;
   late Pointer<Utf8> Function(Pointer<Void> session, Pointer<Utf8> content)
   _sendMessage;
@@ -44,6 +46,16 @@ class ClaudeCore {
   )
   _streamMessage;
 
+  late int Function(Pointer<Utf8> provider, Pointer<Utf8> apiKey) _setApiKey;
+  late Pointer<Utf8> Function(Pointer<Utf8> provider) _getApiKey;
+  late int Function(
+    Pointer<Void> session,
+    Pointer<Utf8> summary,
+    Pointer<Utf8> boundaryMsgId,
+  )
+  _compactSession;
+  late Pointer<Utf8> Function(Pointer<Void> session) _getConversationHistory;
+
   ClaudeCore() {
     if (Platform.isAndroid) {
       _lib = DynamicLibrary.open('libclaude_core.so');
@@ -60,6 +72,10 @@ class ClaudeCore {
         'Unsupported platform: ${Platform.operatingSystem}',
       );
     }
+
+    _initDatabase = _lib
+        .lookup<NativeFunction<Int32 Function(Pointer<Utf8>)>>('init_database')
+        .asFunction();
 
     _createSession = _lib
         .lookup<NativeFunction<Pointer<Void> Function(Pointer<Utf8>)>>(
@@ -121,16 +137,42 @@ class ClaudeCore {
           >
         >('stream_message')
         .asFunction();
+
+    _setApiKey = _lib
+        .lookup<NativeFunction<Int32 Function(Pointer<Utf8>, Pointer<Utf8>)>>(
+          'set_api_key',
+        )
+        .asFunction();
+
+    _getApiKey = _lib
+        .lookup<NativeFunction<Pointer<Utf8> Function(Pointer<Utf8>)>>(
+          'get_api_key',
+        )
+        .asFunction();
+
+    _compactSession = _lib
+        .lookup<
+          NativeFunction<
+            Int32 Function(Pointer<Void>, Pointer<Utf8>, Pointer<Utf8>)
+          >
+        >('compact_session')
+        .asFunction();
+
+    _getConversationHistory = _lib
+        .lookup<NativeFunction<Pointer<Utf8> Function(Pointer<Void>)>>(
+          'get_conversation_history',
+        )
+        .asFunction();
   }
 
   Pointer<Void> createSession(Map<String, dynamic> config) {
     final configJson = jsonEncode(config);
+    debugPrint('🔵 [ClaudeCore.createSession] configJson: $configJson');
     final configPtr = configJson.toNativeUtf8();
-    try {
-      return _createSession(configPtr);
-    } finally {
-      calloc.free(configPtr);
-    }
+    final result = _createSession(configPtr);
+    debugPrint('🔵 [ClaudeCore.createSession] result: $result');
+    calloc.free(configPtr);
+    return result;
   }
 
   String sendMessage(Pointer<Void> session, String content) {
@@ -153,22 +195,23 @@ class ClaudeCore {
     void Function(Map<String, dynamic>) onChunk,
   ) {
     final contentPtr = content.toNativeUtf8();
-
-    final nativeCallable =
-        NativeCallable<Void Function(Pointer<Utf8>, Pointer<Void>)>.listener((
-          Pointer<Utf8> chunkPtr,
-          Pointer<Void> userData,
-        ) {
-          final chunkStr = chunkPtr.toDartString();
-          try {
-            final chunk = jsonDecode(chunkStr) as Map<String, dynamic>;
-            onChunk(chunk);
-          } catch (e) {
-            onChunk({"type": "content", "content": chunkStr});
-          }
-        });
+    NativeCallable<Void Function(Pointer<Utf8>, Pointer<Void>)>? nativeCallable;
 
     try {
+      nativeCallable =
+          NativeCallable<Void Function(Pointer<Utf8>, Pointer<Void>)>.listener((
+            Pointer<Utf8> chunkPtr,
+            Pointer<Void> userData,
+          ) {
+            final chunkStr = chunkPtr.toDartString();
+            try {
+              final chunk = jsonDecode(chunkStr) as Map<String, dynamic>;
+              onChunk(chunk);
+            } catch (e) {
+              onChunk({"type": "content", "content": chunkStr});
+            }
+          });
+
       _streamMessage(
         session,
         contentPtr,
@@ -177,7 +220,8 @@ class ClaudeCore {
       );
     } finally {
       calloc.free(contentPtr);
-      nativeCallable.close();
+      // Always close the NativeCallable to prevent memory leaks
+      nativeCallable?.close();
     }
   }
 
@@ -234,6 +278,15 @@ class ClaudeCore {
     }
   }
 
+  int initDatabase(String dbPath) {
+    final dbPathPtr = dbPath.toNativeUtf8();
+    try {
+      return _initDatabase(dbPathPtr);
+    } finally {
+      calloc.free(dbPathPtr);
+    }
+  }
+
   bool setProvider(Pointer<Void> session, String providerName, String apiKey) {
     final providerNamePtr = providerName.toNativeUtf8();
     final apiKeyPtr = apiKey.toNativeUtf8();
@@ -242,6 +295,56 @@ class ClaudeCore {
     } finally {
       calloc.free(providerNamePtr);
       calloc.free(apiKeyPtr);
+    }
+  }
+
+  int setApiKey(String provider, String apiKey) {
+    final providerPtr = provider.toNativeUtf8();
+    final apiKeyPtr = apiKey.toNativeUtf8();
+    try {
+      return _setApiKey(providerPtr, apiKeyPtr);
+    } finally {
+      calloc.free(providerPtr);
+      calloc.free(apiKeyPtr);
+    }
+  }
+
+  String? getApiKey(String provider) {
+    final providerPtr = provider.toNativeUtf8();
+    try {
+      final resultPtr = _getApiKey(providerPtr);
+      try {
+        final key = resultPtr.toDartString();
+        return key.isEmpty ? null : key;
+      } finally {
+        _freeString(resultPtr);
+      }
+    } finally {
+      calloc.free(providerPtr);
+    }
+  }
+
+  int compactSession(
+    Pointer<Void> session,
+    String summary,
+    String boundaryMsgId,
+  ) {
+    final summaryPtr = summary.toNativeUtf8();
+    final boundaryMsgIdPtr = boundaryMsgId.toNativeUtf8();
+    try {
+      return _compactSession(session, summaryPtr, boundaryMsgIdPtr);
+    } finally {
+      calloc.free(summaryPtr);
+      calloc.free(boundaryMsgIdPtr);
+    }
+  }
+
+  String getConversationHistory(Pointer<Void> session) {
+    final resultPtr = _getConversationHistory(session);
+    try {
+      return resultPtr.toDartString();
+    } finally {
+      _freeString(resultPtr);
     }
   }
 }

@@ -32,8 +32,23 @@ pub enum ClaudeError {
     #[error("Authentication error: {message}")]
     AuthError { message: String },
 
+    #[error("Database error: {0}")]
+    DatabaseError(String),
+
     #[error("Unknown error: {0}")]
     Unknown(String),
+}
+
+impl From<rusqlite::Error> for ClaudeError {
+    fn from(err: rusqlite::Error) -> Self {
+        ClaudeError::DatabaseError(err.to_string())
+    }
+}
+
+impl From<String> for ClaudeError {
+    fn from(err: String) -> Self {
+        ClaudeError::DatabaseError(err)
+    }
 }
 
 impl serde::Serialize for ClaudeError {
@@ -80,6 +95,7 @@ impl serde::Serialize for ClaudeError {
             ClaudeError::NetworkError { message: _ } => ("network_error".to_string(), None, None, None, None, None, None),
             ClaudeError::RateLimitError { provider, retry_after } => ("rate_limit_error".to_string(), Some(provider.clone()), None, None, None, None, Some(*retry_after)),
             ClaudeError::AuthError { message: _ } => ("auth_error".to_string(), None, None, None, None, None, None),
+            ClaudeError::DatabaseError(_) => ("database_error".to_string(), None, None, None, None, None, None),
             ClaudeError::Unknown(_) => ("unknown_error".to_string(), None, None, None, None, None, None),
         };
 

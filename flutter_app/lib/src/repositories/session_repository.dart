@@ -13,6 +13,7 @@ class SessionRepository {
     required String provider,
     required String model,
     int maxTokens = 4096,
+    String? apiKey,
   }) {
     destroySession();
 
@@ -23,7 +24,14 @@ class SessionRepository {
     };
 
     _session = _claudeCore.createSession(config);
-    return _session != nullptr;
+    if (_session == null || _session == nullptr) return false;
+
+    // If API key is provided, set the provider immediately
+    if (apiKey != null && apiKey.isNotEmpty) {
+      _claudeCore.setProvider(_session!, provider, apiKey);
+    }
+
+    return true;
   }
 
   void destroySession() {
@@ -60,6 +68,35 @@ class SessionRepository {
       throw Exception('No active session');
     }
     _claudeCore.streamMessage(_session!, content, onChunk);
+  }
+
+  String getMessages() {
+    if (_session == null || _session == nullptr) {
+      throw Exception('No active session');
+    }
+    return _claudeCore.getMessages(_session!);
+  }
+
+  String getConversationHistory() {
+    if (_session == null || _session == nullptr) {
+      throw Exception('No active session');
+    }
+    return _claudeCore.getConversationHistory(_session!);
+  }
+
+  int compactSession(String summary, String boundaryMsgId) {
+    if (_session == null || _session == nullptr) {
+      throw Exception('No active session');
+    }
+    return _claudeCore.compactSession(_session!, summary, boundaryMsgId);
+  }
+
+  int setApiKey(String provider, String apiKey) {
+    return _claudeCore.setApiKey(provider, apiKey);
+  }
+
+  String? getApiKey(String provider) {
+    return _claudeCore.getApiKey(provider);
   }
 
   void dispose() {
