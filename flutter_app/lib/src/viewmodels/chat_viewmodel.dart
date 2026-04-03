@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ffi';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'providers.dart';
@@ -62,11 +63,15 @@ class ChatNotifier extends StateNotifier<ChatState> {
   void _initSession() {
     final repo = ref.read(sessionRepositoryProvider);
     final apiKey = repo.getApiKey(state.currentProvider) ?? '';
+    debugPrint('🔵 [ChatNotifier._initSession] Provider: ${state.currentProvider}, API Key: ${apiKey.isEmpty ? "空" : "有值"}');
+    
     final success = repo.createSession(
       provider: state.currentProvider,
       model: state.currentModel.isEmpty ? 'auto' : state.currentModel,
       apiKey: apiKey,
     );
+    debugPrint('🔵 [ChatNotifier._initSession] Session 创建结果：$success');
+    
     if (!success) {
       throw Exception('Failed to create session');
     }
@@ -81,10 +86,25 @@ class ChatNotifier extends StateNotifier<ChatState> {
         repo.getApiKey(state.currentProvider) ??
         state.apiKeys[state.currentProvider] ??
         '';
+    debugPrint('🔵 [ChatNotifier.sendMessage] Provider: ${state.currentProvider}, API Key: ${apiKey.isEmpty ? "空" : "有值"}, Session: ${repo.session != null}');
+    
     if (apiKey.isEmpty) {
       throw Exception('Please configure API Key in settings');
     }
 
+    // Ensure session exists and has the correct API key
+    if (repo.session == null || repo.session == nullptr) {
+      debugPrint('🔵 [ChatNotifier.sendMessage] Session 为空，创建新会话');
+      final success = repo.createSession(
+        provider: state.currentProvider,
+        model: state.currentModel.isEmpty ? 'auto' : state.currentModel,
+        apiKey: apiKey,
+      );
+      if (!success) {
+        throw Exception('Failed to create session');
+      }
+    }
+    
     repo.setProvider(state.currentProvider, apiKey);
 
     // Pre-add user and empty assistant messages

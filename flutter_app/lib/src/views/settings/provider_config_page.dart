@@ -15,25 +15,28 @@ class _ProviderConfigPageState extends ConsumerState<ProviderConfigPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late TextEditingController _apiKeyController;
+  String? _lastLoadedApiKey;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    final state = ref.read(settingsNotifierProvider);
-    _apiKeyController = TextEditingController(text: state.apiKey);
+    _apiKeyController = TextEditingController(text: '');
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // 每次页面显示时重新加载 API Key
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        final state = ref.read(settingsNotifierProvider);
-        _apiKeyController.text = state.apiKey;
-      }
-    });
+    // Watch for state changes and update text field
+    final state = ref.watch(settingsNotifierProvider);
+    if (state.apiKey.isNotEmpty && state.apiKey != _lastLoadedApiKey) {
+      _lastLoadedApiKey = state.apiKey;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _apiKeyController.text != state.apiKey) {
+          _apiKeyController.text = state.apiKey;
+        }
+      });
+    }
   }
 
   @override

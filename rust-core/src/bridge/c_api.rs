@@ -214,6 +214,7 @@ pub extern "C" fn stream_message(
     user_data: *mut c_void,
 ) -> c_int {
     if session_ptr.is_null() || content.is_null() {
+        eprintln!("❌ [Rust] stream_message: null pointer");
         return -1;
     }
 
@@ -221,8 +222,28 @@ pub extern "C" fn stream_message(
     let content_cstr = unsafe { CStr::from_ptr(content) };
     let content_str = match content_cstr.to_str() {
         Ok(s) => s,
-        Err(_) => return -1,
+        Err(e) => {
+            eprintln!("❌ [Rust] stream_message: content to_str failed: {}", e);
+            return -1;
+        }
     };
+
+    eprintln!("🔵 [Rust] stream_message: content = {}", content_str);
+
+    // Check if provider is configured
+    let provider = session.provider.read();
+    if provider.is_none() {
+        eprintln!("❌ [Rust] stream_message: No provider configured");
+        drop(provider);
+        // Send error callback
+        let error_chunk = r#"{"type":"error","content":"No provider configured"}"#;
+        if let Ok(c_error) = CString::new(error_chunk) {
+            unsafe { callback(c_error.as_ptr(), user_data) };
+        }
+        return -1;
+    }
+    eprintln!("✅ [Rust] stream_message: Provider configured");
+    drop(provider);
 
     let user_message = Message::user(content_str);
 

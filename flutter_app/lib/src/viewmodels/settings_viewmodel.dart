@@ -51,8 +51,38 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   File? _logFile;
 
   SettingsNotifier(this.ref) : super(const SettingsState()) {
-    _initLogFile();
-    _loadSavedConfigAndInit();
+    _loadSavedConfigAndInitSync();
+  }
+
+  void _loadSavedConfigAndInitSync() {
+    final repo = ref.read(sessionRepositoryProvider);
+    final savedApiKey = repo.getApiKey(state.selectedProvider);
+
+    final log1 = '🔵 [SettingsNotifier] 同步加载 API Key - Provider: ${state.selectedProvider}, 结果：${savedApiKey ?? "null"}';
+    debugPrint(log1);
+    _writeLog(log1);
+
+    if (savedApiKey != null && savedApiKey.isNotEmpty) {
+      state = state.copyWith(apiKey: savedApiKey);
+      final log2 = '🔵 [SettingsNotifier] 已更新 state.apiKey';
+      debugPrint(log2);
+      _writeLog(log2);
+    }
+
+    _createTempSession();
+    
+    final log3 = '🔵 [SettingsNotifier] 创建会话后 - _tempSession: ${_tempSession != null}, apiKey: ${state.apiKey.isEmpty ? "空" : "有值"}';
+    debugPrint(log3);
+    _writeLog(log3);
+    
+    // 如果有 API Key，设置到 session 中
+    if (state.apiKey.isNotEmpty && _tempSession != null && _tempSession != nullptr) {
+      final claudeCore = ref.read(claudeCoreProvider);
+      final result = claudeCore.setProvider(_tempSession!, state.selectedProvider, state.apiKey);
+      final log4 = '🔵 [SettingsNotifier] 设置 Provider 结果：$result';
+      debugPrint(log4);
+      _writeLog(log4);
+    }
   }
 
   Future<void> _initLogFile() async {
@@ -61,7 +91,8 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       final directory = await getExternalStorageDirectory();
       if (directory != null) {
         _logFile = File('${directory.path}/claude_app.log');
-        await _writeLog('=== 应用启动 ===\n');
+        final timestamp = DateTime.now().toString();
+        await _logFile!.writeAsString('[$timestamp] === 应用启动 ===\n');
         debugPrint('📁 日志文件路径：${_logFile!.path}');
       }
     } catch (e) {
@@ -70,6 +101,11 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   }
 
   Future<void> _writeLog(String message) async {
+    // 延迟初始化日志文件
+    if (_logFile == null) {
+      await _initLogFile();
+    }
+    
     if (_logFile != null) {
       try {
         final timestamp = DateTime.now().toString();
@@ -77,37 +113,6 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       } catch (e) {
         debugPrint('❌ 写入日志失败：$e');
       }
-    }
-  }
-
-  Future<void> _loadSavedConfigAndInit() async {
-    final repo = ref.read(sessionRepositoryProvider);
-    final savedApiKey = repo.getApiKey(state.selectedProvider);
-
-    final log1 = '🔵 [SettingsNotifier] 加载 API Key - Provider: ${state.selectedProvider}, 结果：${savedApiKey ?? "null"}';
-    debugPrint(log1);
-    await _writeLog(log1);
-
-    if (savedApiKey != null && savedApiKey.isNotEmpty) {
-      state = state.copyWith(apiKey: savedApiKey);
-      final log2 = '🔵 [SettingsNotifier] 已更新 state.apiKey';
-      debugPrint(log2);
-      await _writeLog(log2);
-    }
-
-    _createTempSession();
-    
-    final log3 = '🔵 [SettingsNotifier] 创建会话后 - _tempSession: ${_tempSession != null}, apiKey: ${state.apiKey.isEmpty ? "空" : "有值"}';
-    debugPrint(log3);
-    await _writeLog(log3);
-    
-    // 如果有 API Key，设置到 session 中
-    if (state.apiKey.isNotEmpty && _tempSession != null && _tempSession != nullptr) {
-      final claudeCore = ref.read(claudeCoreProvider);
-      final result = claudeCore.setProvider(_tempSession!, state.selectedProvider, state.apiKey);
-      final log4 = '🔵 [SettingsNotifier] 设置 Provider 结果：$result';
-      debugPrint(log4);
-      await _writeLog(log4);
     }
   }
 

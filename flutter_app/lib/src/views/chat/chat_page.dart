@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_theme.dart';
 import '../../core/app_config.dart';
 import '../../viewmodels/viewmodels.dart';
+import '../../viewmodels/providers.dart';
 import '../settings/settings_page.dart';
 import 'widgets/widgets.dart';
 
@@ -31,7 +32,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final state = ref.read(chatNotifierProvider);
     if (state.isStreaming) return;
 
-    final apiKey = state.apiKeys[state.currentProvider] ?? '';
+    final repo = ref.read(sessionRepositoryProvider);
+    final apiKey = repo.getApiKey(state.currentProvider) ?? state.apiKeys[state.currentProvider] ?? '';
+    
+    debugPrint('🔵 [_sendMessage] Provider: ${state.currentProvider}, state.apiKeys: ${state.apiKeys[state.currentProvider]}, DB API Key: ${repo.getApiKey(state.currentProvider)}, 最终：${apiKey.isEmpty ? "空" : "有值"}');
+    
     if (apiKey.isEmpty) {
       _showError('请先在设置中配置 API Key');
       return;
@@ -41,9 +46,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _scrollToBottom();
 
     try {
+      debugPrint('🔵 [_sendMessage] 准备发送消息');
       ref.read(chatNotifierProvider.notifier).sendMessage(text);
     } catch (e) {
-      _showError('发送失败: $e');
+      debugPrint('🔴 [_sendMessage] 发送异常：$e');
+      _showError('发送失败：$e');
     }
   }
 
