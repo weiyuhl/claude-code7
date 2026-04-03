@@ -281,24 +281,55 @@ pub extern "C" fn stream_message(
 
     // Spawn on background tokio thread so this FFI call returns immediately,
     // allowing the Dart event loop to process NativeCallable.listener callbacks.
+    eprintln!("🔵 [Rust] stream_message: spawning async task");
     get_runtime().spawn(async move {
+        eprintln!("🔵 [Rust] stream_message: async task started");
         let session_arc = unsafe { Arc::from_raw(session_ptr_usize as *const Session) };
 
+        // Check provider
+        let provider_ok = {
+            let provider_guard = session_arc.provider.read();
+            provider_guard.as_ref().map(|p| p.name().to_string())
+        };
+        if provider_ok.is_none() {
+            eprintln!("❌ [Rust] stream_message async: No provider configured");
+            let error_chunk = serde_json::json!({
+                "type": "error",
+                "content": "No provider configured on session"
+            });
+            if let Ok(c_error) = CString::new(error_chunk.to_string()) {
+                let ptr = c_error.into_raw();
+                unsafe {
+                    (callback_wrapper.callback)(ptr, callback_wrapper.user_data as *mut c_void);
+                }
+            }
+            std::mem::forget(session_arc);
+            return;
+        }
+        eprintln!("✅ [Rust] stream_message async: Provider configured: {}", provider_ok.unwrap());
+
+        eprintln!("🔵 [Rust] stream_message async: messages count = {}", messages_clone.len());
+
         let mut send_callback = move |chunk: String| {
+            eprintln!("🔵 [Rust] stream_message async: sending callback chunk: {}", &chunk[..chunk.len().min(100)]);
             let c_chunk = match CString::new(chunk) {
                 Ok(c) => c,
                 Err(_) => return,
             };
+            // Leak the CString so Dart can safely read it; Dart will free via free_string
+            let ptr = c_chunk.into_raw();
             unsafe {
-                (callback_wrapper.callback)(c_chunk.as_ptr(), callback_wrapper.user_data as *mut c_void);
+                (callback_wrapper.callback)(ptr, callback_wrapper.user_data as *mut c_void);
             }
         };
 
+        eprintln!("🔵 [Rust] stream_message async: calling execute_streaming_query");
         let result = crate::execute_streaming_query(
             &session_arc,
             &messages_clone,
             &mut send_callback,
         ).await;
+        eprintln!("🔵 [Rust] stream_message async: execute_streaming_query returned: {:?}", result.is_ok());
 
         match result {
             Ok(response) => {
@@ -325,8 +356,9 @@ pub extern "C" fn stream_message(
                     "content": e.to_string()
                 });
                 if let Ok(c_error) = CString::new(error_chunk.to_string()) {
+                    let ptr = c_error.into_raw();
                     unsafe {
-                        (callback_wrapper.callback)(c_error.as_ptr(), callback_wrapper.user_data as *mut c_void);
+                        (callback_wrapper.callback)(ptr, callback_wrapper.user_data as *mut c_void);
                     }
                 }
             }

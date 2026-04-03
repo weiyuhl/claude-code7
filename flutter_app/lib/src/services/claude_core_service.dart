@@ -206,6 +206,8 @@ class ClaudeCore {
       final chunkStr = chunkPtr.toDartString();
       debugPrint(
           '🔵 [ClaudeCoreService.streamMessage] 收到 chunk: $chunkStr');
+      // Free the leaked CString from Rust
+      _freeString(chunkPtr);
       try {
         final chunk = jsonDecode(chunkStr) as Map<String, dynamic>;
         onChunk(chunk);

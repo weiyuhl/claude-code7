@@ -180,7 +180,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 
   void updateProvider(String provider) {
-    state = state.copyWith(currentProvider: provider, currentModel: '');
+    state = state.copyWith(currentProvider: provider);
     _recreateSession();
   }
 

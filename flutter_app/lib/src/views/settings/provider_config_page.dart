@@ -63,7 +63,12 @@ class _ProviderConfigPageState extends ConsumerState<ProviderConfigPage>
       // 保存到数据库
       await settingsNotifier.saveApiKey(state.selectedProvider, apiKey);
 
-      // 更新 ChatViewModel 中的 API Key
+      // 同步选中的模型到 ChatNotifier
+      if (state.selectedModel.isNotEmpty) {
+        chatNotifier.updateModel(state.selectedModel);
+      }
+
+      // 更新 ChatNotifier 中的 Provider 和 API Key
       chatNotifier.updateApiKey(state.selectedProvider, apiKey);
       chatNotifier.updateProvider(state.selectedProvider);
 
