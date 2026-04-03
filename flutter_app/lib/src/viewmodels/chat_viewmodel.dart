@@ -3,6 +3,7 @@ import 'dart:ffi';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'providers.dart';
+import 'settings_viewmodel.dart';
 
 class ChatState {
   final List<Map<String, dynamic>> messages;
@@ -55,6 +56,16 @@ class ChatNotifier extends StateNotifier<ChatState> {
     _loadApiKeyAndInit();
   }
 
+  void _writeLog(String message) {
+    try {
+      // 通过动态方式获取 settingsNotifier，避免循环依赖
+      final settingsNotifier = ref.read(settingsNotifierProvider.notifier);
+      settingsNotifier.writeLogForChat(message);
+    } catch (e) {
+      // 忽略日志写入失败
+    }
+  }
+
   Future<void> _loadApiKeyAndInit() async {
     await loadApiKeyFromStorage();
     _initSession();
@@ -63,14 +74,14 @@ class ChatNotifier extends StateNotifier<ChatState> {
   void _initSession() {
     final repo = ref.read(sessionRepositoryProvider);
     final apiKey = repo.getApiKey(state.currentProvider) ?? '';
-    debugPrint('🔵 [ChatNotifier._initSession] Provider: ${state.currentProvider}, API Key: ${apiKey.isEmpty ? "空" : "有值"}');
+    _writeLog('🔵 [ChatNotifier._initSession] Provider: ${state.currentProvider}, API Key: ${apiKey.isEmpty ? "空" : "有值"}');
     
     final success = repo.createSession(
       provider: state.currentProvider,
       model: state.currentModel.isEmpty ? 'auto' : state.currentModel,
       apiKey: apiKey,
     );
-    debugPrint('🔵 [ChatNotifier._initSession] Session 创建结果：$success');
+    _writeLog('🔵 [ChatNotifier._initSession] Session 创建结果：$success');
     
     if (!success) {
       throw Exception('Failed to create session');
@@ -78,7 +89,12 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 
   void sendMessage(String text) {
-    if (text.isEmpty || state.isStreaming) return;
+    _writeLog('🔵 [ChatNotifier.sendMessage] 被调用，text: $text, isStreaming: ${state.isStreaming}');
+    
+    if (text.isEmpty || state.isStreaming) {
+      _writeLog('🔴 [ChatNotifier.sendMessage] text 为空或正在流式传输，直接返回');
+      return;
+    }
 
     final repo = ref.read(sessionRepositoryProvider);
     // Always read API key from DB, not just in-memory state
@@ -86,7 +102,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
         repo.getApiKey(state.currentProvider) ??
         state.apiKeys[state.currentProvider] ??
         '';
-    debugPrint('🔵 [ChatNotifier.sendMessage] Provider: ${state.currentProvider}, API Key: ${apiKey.isEmpty ? "空" : "有值"}, Session: ${repo.session != null}');
+    _writeLog('🔵 [ChatNotifier.sendMessage] Provider: ${state.currentProvider}, API Key: ${apiKey.isEmpty ? "空" : "有值"}, Session: ${repo.session != null}');
     
     if (apiKey.isEmpty) {
       throw Exception('Please configure API Key in settings');
@@ -94,18 +110,20 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
     // Ensure session exists and has the correct API key
     if (repo.session == null || repo.session == nullptr) {
-      debugPrint('🔵 [ChatNotifier.sendMessage] Session 为空，创建新会话');
+      _writeLog('🔵 [ChatNotifier.sendMessage] Session 为空，创建新会话');
       final success = repo.createSession(
         provider: state.currentProvider,
         model: state.currentModel.isEmpty ? 'auto' : state.currentModel,
         apiKey: apiKey,
       );
       if (!success) {
+        _writeLog('🔴 [ChatNotifier.sendMessage] 创建会话失败');
         throw Exception('Failed to create session');
       }
     }
     
     repo.setProvider(state.currentProvider, apiKey);
+    _writeLog('🔵 [ChatNotifier.sendMessage] 设置 Provider 完成');
 
     // Pre-add user and empty assistant messages
     state = state.copyWith(

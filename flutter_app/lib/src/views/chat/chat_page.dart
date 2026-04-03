@@ -27,17 +27,28 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   void _sendMessage() {
     final text = _messageController.text.trim();
-    if (text.isEmpty) return;
+    _writeLogSync('🔵 [_sendMessage] 被调用，text: "$text"');
+    
+    if (text.isEmpty) {
+      _writeLogSync('🔴 [_sendMessage] 消息为空，返回');
+      return;
+    }
 
     final state = ref.read(chatNotifierProvider);
-    if (state.isStreaming) return;
+    _writeLogSync('🔵 [_sendMessage] isStreaming: ${state.isStreaming}');
+    
+    if (state.isStreaming) {
+      _writeLogSync('🔴 [_sendMessage] 正在流式传输，返回');
+      return;
+    }
 
     final repo = ref.read(sessionRepositoryProvider);
     final apiKey = repo.getApiKey(state.currentProvider) ?? state.apiKeys[state.currentProvider] ?? '';
     
-    debugPrint('🔵 [_sendMessage] Provider: ${state.currentProvider}, state.apiKeys: ${state.apiKeys[state.currentProvider]}, DB API Key: ${repo.getApiKey(state.currentProvider)}, 最终：${apiKey.isEmpty ? "空" : "有值"}');
+    _writeLogSync('🔵 [_sendMessage] Provider: ${state.currentProvider}, API Key: ${apiKey.isEmpty ? "空" : "有值"}');
     
     if (apiKey.isEmpty) {
+      _writeLogSync('🔴 [_sendMessage] API Key 为空，显示错误');
       _showError('请先在设置中配置 API Key');
       return;
     }
@@ -46,12 +57,28 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _scrollToBottom();
 
     try {
-      debugPrint('🔵 [_sendMessage] 准备发送消息');
+      _writeLogSync('🔵 [_sendMessage] 准备发送消息');
       ref.read(chatNotifierProvider.notifier).sendMessage(text);
+      _writeLogSync('🔵 [_sendMessage] sendMessage 调用完成');
     } catch (e) {
-      debugPrint('🔴 [_sendMessage] 发送异常：$e');
+      _writeLogSync('🔴 [_sendMessage] 发送异常：$e');
       _showError('发送失败：$e');
     }
+  }
+
+  void _writeLogSync(String message) {
+    try {
+      final settingsNotifier = ref.read(settingsNotifierProvider.notifier);
+      // 同步写入日志
+      settingsNotifier.writeLogForChat(message);
+    } catch (e) {
+      // 忽略错误
+    }
+  }
+
+  void _writeLog(String message) {
+    final settingsNotifier = ref.read(settingsNotifierProvider.notifier);
+    settingsNotifier.writeLogForChat(message);
   }
 
   void _showError(String message) {
@@ -203,8 +230,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             ),
           ),
           const SizedBox(width: 8),
+          // 发送按钮
           GestureDetector(
-            onTap: isStreaming ? null : _sendMessage,
+            onTap: () {
+              _writeLog('🔵 [发送按钮] 被点击！');
+              if (isStreaming) {
+                _writeLog('🔵 [发送按钮] 正在流式传输中，忽略点击');
+                return;
+              }
+              _sendMessage();
+            },
             child: Container(
               width: 40,
               height: 40,

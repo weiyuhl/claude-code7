@@ -16,10 +16,13 @@ impl QueryEngine {
     ) -> Result<String, ClaudeError> {
         let messages: Vec<_> = messages.iter().collect();
 
-        let provider = session.provider.read();
-        let provider = provider.as_ref().ok_or_else(|| ClaudeError::ConfigError {
-            message: "No provider configured".to_string(),
-        })?;
+        let provider = {
+            let guard = session.provider.read();
+            let p = guard.as_ref().ok_or_else(|| ClaudeError::ConfigError {
+                message: "No provider configured".to_string(),
+            })?;
+            Arc::clone(p)
+        };
 
         let response = provider.chat_completion(
             &session.config.model,
@@ -44,10 +47,13 @@ impl QueryEngine {
     ) -> Result<String, ClaudeError> {
         let messages: Vec<_> = messages.iter().collect();
 
-        let provider = session.provider.read();
-        let provider = provider.as_ref().ok_or_else(|| ClaudeError::ConfigError {
-            message: "No provider configured".to_string(),
-        })?;
+        let provider = {
+            let guard = session.provider.read();
+            let p = guard.as_ref().ok_or_else(|| ClaudeError::ConfigError {
+                message: "No provider configured".to_string(),
+            })?;
+            Arc::clone(p)
+        };
 
         let full_response = provider.stream_chat_completion(
             &session.config.model,
@@ -79,13 +85,15 @@ impl QueryEngine {
 
         messages.push(Message::user(user_message.to_string()));
 
-        let messages_refs: Vec<&Message> = messages.iter().collect();
-        let messages_slice: Vec<Message> = messages_refs.into_iter().cloned().collect();
+        let messages_slice: Vec<Message> = messages.into_iter().collect();
         
-        let provider = session.provider.read();
-        let provider = provider.as_ref().ok_or_else(|| ClaudeError::ConfigError {
-            message: "No provider configured".to_string(),
-        })?;
+        let provider = {
+            let guard = session.provider.read();
+            let p = guard.as_ref().ok_or_else(|| ClaudeError::ConfigError {
+                message: "No provider configured".to_string(),
+            })?;
+            Arc::clone(p)
+        };
 
         let messages_for_provider: Vec<&Message> = messages_slice.iter().collect();
         let response = provider.chat_completion(
@@ -118,10 +126,13 @@ impl QueryEngine {
 
         messages.push(Message::user(user_message.to_string()));
 
-        let provider = session.provider.read();
-        let provider = provider.as_ref().ok_or_else(|| ClaudeError::ConfigError {
-            message: "No provider configured".to_string(),
-        })?;
+        let provider = {
+            let guard = session.provider.read();
+            let p = guard.as_ref().ok_or_else(|| ClaudeError::ConfigError {
+                message: "No provider configured".to_string(),
+            })?;
+            Arc::clone(p)
+        };
 
         let messages_for_provider: Vec<&Message> = messages.iter().collect();
         let full_response = provider.stream_chat_completion(

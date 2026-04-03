@@ -28,7 +28,7 @@ impl DeepSeekProvider {
     pub fn new(api_key: impl Into<String>, base_url: Option<String>) -> Self {
         Self {
             api_key: api_key.into(),
-            base_url: base_url.unwrap_or_else(|| "https://api.deepseek.com".to_string()),
+            base_url: base_url.unwrap_or_else(|| "https://api.deepseek.com/v1".to_string()),
             client: Client::new(),
             rate_limiter: Arc::new(RwLock::new(RateLimiter {
                 requests_remaining: 100,

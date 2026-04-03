@@ -1,0 +1,15 @@
+language = "C"
+include_guard = "CLAUDE_CORE_H"
+header = "/* Auto-generated C header for claude-core FFI */"
+cpp_compat = true
+
+[export]
+prefix = "ClaudeCore_"
+item_types = ["functions", "structs", "globals"]
+
+[export.rename]
+"StreamCallback" = "StreamCallback"
+
+[parse]
+parse_deps = false
+include = ["claude-core"]

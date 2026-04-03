@@ -218,6 +218,7 @@ pub extern "C" fn stream_message(
         return -1;
     }
 
+    let session_ptr_usize = session_ptr as usize;
     let session = unsafe { &*(session_ptr as *const Session) };
     let content_cstr = unsafe { CStr::from_ptr(content) };
     let content_str = match content_cstr.to_str() {
@@ -235,7 +236,6 @@ pub extern "C" fn stream_message(
     if provider.is_none() {
         eprintln!("❌ [Rust] stream_message: No provider configured");
         drop(provider);
-        // Send error callback
         let error_chunk = r#"{"type":"error","content":"No provider configured"}"#;
         if let Ok(c_error) = CString::new(error_chunk) {
             unsafe { callback(c_error.as_ptr(), user_data) };
@@ -254,7 +254,7 @@ pub extern "C" fn stream_message(
 
     // Persist user message to DB
     if let Ok(conversation_engine) = std::panic::catch_unwind(|| ConversationEngine::new()) {
-        let session_arc = unsafe { Arc::from_raw(session_ptr as *const Session) };
+        let session_arc = unsafe { Arc::from_raw(session_ptr_usize as *const Session) };
         let _ = get_runtime().block_on(async {
             let _ = conversation_engine.submit_message(&session_arc, content_str, None).await;
         });
@@ -274,49 +274,68 @@ pub extern "C" fn stream_message(
         user_data: user_data as usize,
     };
 
-    let mut send_callback = move |chunk: String| {
-        let c_chunk = CString::new(chunk).unwrap();
-        (callback_wrapper.callback)(c_chunk.as_ptr(), callback_wrapper.user_data as *mut c_void);
-    };
-
     let messages_clone: Vec<Message> = {
         let messages = session.messages.read();
         messages.clone()
     };
 
-    let session_arc = unsafe { Arc::from_raw(session_ptr as *const Session) };
-    let result = get_runtime().block_on(crate::execute_streaming_query(
-        &session_arc,
-        &messages_clone,
-        &mut send_callback,
-    ));
-    std::mem::forget(session_arc);
+    // Spawn on background tokio thread so this FFI call returns immediately,
+    // allowing the Dart event loop to process NativeCallable.listener callbacks.
+    get_runtime().spawn(async move {
+        let session_arc = unsafe { Arc::from_raw(session_ptr_usize as *const Session) };
 
-    match result {
-        Ok(response) => {
-            let assistant_message = Message::assistant(&response);
-            let assistant_content = assistant_message.content.clone();
-            let assistant_thinking = assistant_message.thinking.clone();
-            {
-                let mut messages = session.messages.write();
-                messages.push(assistant_message);
+        let mut send_callback = move |chunk: String| {
+            let c_chunk = match CString::new(chunk) {
+                Ok(c) => c,
+                Err(_) => return,
+            };
+            unsafe {
+                (callback_wrapper.callback)(c_chunk.as_ptr(), callback_wrapper.user_data as *mut c_void);
             }
-            // Persist assistant message to DB
-            if let Ok(conversation_engine) = std::panic::catch_unwind(|| ConversationEngine::new()) {
-                let session_arc = unsafe { Arc::from_raw(session_ptr as *const Session) };
-                let _ = get_runtime().block_on(async {
+        };
+
+        let result = crate::execute_streaming_query(
+            &session_arc,
+            &messages_clone,
+            &mut send_callback,
+        ).await;
+
+        match result {
+            Ok(response) => {
+                let assistant_message = Message::assistant(&response);
+                let assistant_content = assistant_message.content.clone();
+                let assistant_thinking = assistant_message.thinking.clone();
+                {
+                    let mut messages = session_arc.messages.write();
+                    messages.push(assistant_message);
+                }
+                // Persist assistant message to DB
+                if let Ok(conversation_engine) = std::panic::catch_unwind(|| ConversationEngine::new()) {
                     let _ = conversation_engine.process_assistant_response(
                         &session_arc,
                         &assistant_content,
                         assistant_thinking.as_deref(),
                     ).await;
-                });
-                std::mem::forget(session_arc);
+                }
             }
-            0
+            Err(e) => {
+                eprintln!("❌ [Rust] stream_message async: {}", e);
+                let error_chunk = serde_json::json!({
+                    "type": "error",
+                    "content": e.to_string()
+                });
+                if let Ok(c_error) = CString::new(error_chunk.to_string()) {
+                    unsafe {
+                        (callback_wrapper.callback)(c_error.as_ptr(), callback_wrapper.user_data as *mut c_void);
+                    }
+                }
+            }
         }
-        Err(_) => -1,
-    }
+
+        std::mem::forget(session_arc);
+    });
+
+    0
 }
 
 #[no_mangle]

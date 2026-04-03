@@ -109,11 +109,19 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     if (_logFile != null) {
       try {
         final timestamp = DateTime.now().toString();
-        await _logFile!.writeAsString('[$timestamp] $message\n', mode: FileMode.append);
+        // 立即写入并刷新
+        final logEntry = '[$timestamp] $message\n';
+        await _logFile!.writeAsString(logEntry, mode: FileMode.append, flush: true);
       } catch (e) {
         debugPrint('❌ 写入日志失败：$e');
       }
     }
+  }
+
+  // 同步写入日志（不等待）
+  void writeLogForChat(String message) {
+    // 异步写入，不等待
+    _writeLog(message).ignore();
   }
 
   void _createTempSession() {

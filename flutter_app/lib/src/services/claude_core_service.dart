@@ -24,7 +24,7 @@ class ClaudeCore {
   late int Function(Pointer<Utf8> dbPath) _initDatabase;
   late Pointer<Void> Function(Pointer<Utf8> configJson) _createSession;
   late Pointer<Utf8> Function(Pointer<Void> session, Pointer<Utf8> content)
-  _sendMessage;
+      _sendMessage;
   late void Function(Pointer<Void> session) _destroySession;
   late Pointer<Utf8> Function(Pointer<Void> session) _getMessages;
   late Pointer<Utf8> Function(Pointer<Void> session) _listModels;
@@ -34,17 +34,15 @@ class ClaudeCore {
     Pointer<Void> session,
     Pointer<Utf8> providerName,
     Pointer<Utf8> apiKey,
-  )
-  _setProvider;
+  ) _setProvider;
 
   late int Function(
     Pointer<Void> session,
     Pointer<Utf8> content,
     Pointer<NativeFunction<Void Function(Pointer<Utf8>, Pointer<Void>)>>
-    callback,
+        callback,
     Pointer<Void> userData,
-  )
-  _streamMessage;
+  ) _streamMessage;
 
   late int Function(Pointer<Utf8> provider, Pointer<Utf8> apiKey) _setApiKey;
   late Pointer<Utf8> Function(Pointer<Utf8> provider) _getApiKey;
@@ -52,9 +50,11 @@ class ClaudeCore {
     Pointer<Void> session,
     Pointer<Utf8> summary,
     Pointer<Utf8> boundaryMsgId,
-  )
-  _compactSession;
+  ) _compactSession;
   late Pointer<Utf8> Function(Pointer<Void> session) _getConversationHistory;
+
+  NativeCallable<Void Function(Pointer<Utf8>, Pointer<Void>)>?
+      _streamCallbackRef;
 
   ClaudeCore() {
     if (Platform.isAndroid) {
@@ -85,8 +85,10 @@ class ClaudeCore {
 
     _sendMessage = _lib
         .lookup<
-          NativeFunction<Pointer<Utf8> Function(Pointer<Void>, Pointer<Utf8>)>
-        >('send_message')
+            NativeFunction<
+                Pointer<Utf8> Function(Pointer<Void>, Pointer<Utf8>)>>(
+          'send_message',
+        )
         .asFunction();
 
     _destroySession = _lib
@@ -117,25 +119,23 @@ class ClaudeCore {
 
     _setProvider = _lib
         .lookup<
-          NativeFunction<
-            Bool Function(Pointer<Void>, Pointer<Utf8>, Pointer<Utf8>)
-          >
-        >('set_provider')
+            NativeFunction<
+                Bool Function(Pointer<Void>, Pointer<Utf8>, Pointer<Utf8>)>>(
+          'set_provider',
+        )
         .asFunction();
 
     _streamMessage = _lib
         .lookup<
-          NativeFunction<
-            Int32 Function(
-              Pointer<Void>,
-              Pointer<Utf8>,
-              Pointer<
-                NativeFunction<Void Function(Pointer<Utf8>, Pointer<Void>)>
-              >,
-              Pointer<Void>,
-            )
-          >
-        >('stream_message')
+            NativeFunction<
+                Int32 Function(
+                  Pointer<Void>,
+                  Pointer<Utf8>,
+                  Pointer<
+                      NativeFunction<
+                          Void Function(Pointer<Utf8>, Pointer<Void>)>>,
+                  Pointer<Void>,
+                )>>('stream_message')
         .asFunction();
 
     _setApiKey = _lib
@@ -152,10 +152,10 @@ class ClaudeCore {
 
     _compactSession = _lib
         .lookup<
-          NativeFunction<
-            Int32 Function(Pointer<Void>, Pointer<Utf8>, Pointer<Utf8>)
-          >
-        >('compact_session')
+            NativeFunction<
+                Int32 Function(Pointer<Void>, Pointer<Utf8>, Pointer<Utf8>)>>(
+          'compact_session',
+        )
         .asFunction();
 
     _getConversationHistory = _lib
@@ -194,38 +194,46 @@ class ClaudeCore {
     String content,
     void Function(Map<String, dynamic>) onChunk,
   ) {
+    debugPrint(
+        '🔵 [ClaudeCoreService.streamMessage] 开始 - content: $content');
+
     final contentPtr = content.toNativeUtf8();
-    NativeCallable<Void Function(Pointer<Utf8>, Pointer<Void>)>? nativeCallable;
+    final nativeCallable =
+        NativeCallable<Void Function(Pointer<Utf8>, Pointer<Void>)>.listener((
+      Pointer<Utf8> chunkPtr,
+      Pointer<Void> userData,
+    ) {
+      final chunkStr = chunkPtr.toDartString();
+      debugPrint(
+          '🔵 [ClaudeCoreService.streamMessage] 收到 chunk: $chunkStr');
+      try {
+        final chunk = jsonDecode(chunkStr) as Map<String, dynamic>;
+        onChunk(chunk);
+      } catch (e) {
+        onChunk({"type": "content", "content": chunkStr});
+      }
+    });
+
+    _streamCallbackRef = nativeCallable;
 
     try {
-      nativeCallable =
-          NativeCallable<Void Function(Pointer<Utf8>, Pointer<Void>)>.listener((
-            Pointer<Utf8> chunkPtr,
-            Pointer<Void> userData,
-          ) {
-            final chunkStr = chunkPtr.toDartString();
-            try {
-              final chunk = jsonDecode(chunkStr) as Map<String, dynamic>;
-              onChunk(chunk);
-            } catch (e) {
-              onChunk({"type": "content", "content": chunkStr});
-            }
-          });
-
+      debugPrint('🔵 [ClaudeCoreService.streamMessage] 调用 _streamMessage');
       _streamMessage(
         session,
         contentPtr,
         nativeCallable.nativeFunction,
         nullptr,
       );
+      debugPrint(
+          '🔵 [ClaudeCoreService.streamMessage] _streamMessage 调用完成');
     } finally {
       calloc.free(contentPtr);
-      // Always close the NativeCallable to prevent memory leaks
-      nativeCallable?.close();
     }
   }
 
   void destroySession(Pointer<Void> session) {
+    _streamCallbackRef?.close();
+    _streamCallbackRef = null;
     _destroySession(session);
   }
 
